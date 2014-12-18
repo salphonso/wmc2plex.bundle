@@ -12,7 +12,7 @@ import socket
 import struct
 import datetime
 from datetime import timedelta
-import os.path
+import os.path, os
 
 PREFIX = '/video/wmc2plex'
 NAME = 'PlexWMC'
@@ -28,7 +28,6 @@ TIME_MIN = datetime.datetime(1900, 1, 1, 0, 0)
 TIME_T_REF = datetime.datetime(1970, 1, 1, 0, 0)
 EPGDAYS = int(Prefs['serverwmc_epg_days'])
 DEBUG = Prefs['debug']
-HDHR_URL = 'http://192.168.1.31:5004/auto/v'
 STREAMID = 0
 DURATION = 14400000
 
@@ -57,6 +56,7 @@ def MainMenu():
 
 	#Channels
 	oc.add(DirectoryObject(key = Callback(ListChannels), title='Channels'))
+	oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recordings'))
 
         return oc
 	
@@ -76,28 +76,39 @@ def ListChannels():
                 channelArray = result.split('|')
                 channelID = channelArray[0]
                 try:
-                        channelImageFile = channelArray[5].split('/')[-1]
+                        channelImageFile = 'file://' + channelArray[5].split('@')[-1] #channelArray[5].split('/')[-1]
                 except:
                         channelImageFile = ''
                 channelNumber = channelArray[2]
                 channelName = channelArray[8]
                 Title = channelName + '(' + channelNumber + ')'
                 channelURL = channelArray[9]
-                Thumb = R(channelImageFile)
+                Thumb = channelImageFile
                 if DEBUG:
                         Log.Debug(channelImageFile + ' - ' + channelArray[5])
                         Log.Debug(Title + ', ' + channelURL + ', ' + channelImageFile + ', '
                                   + channelNumber + ', ' + channelName)
 
-
-                #oc.add(DirectoryObject(key = Callback(ChannelInfo, ID=channelID),
-                #                       title = Title,
-                #                       thumb = channelImagePath
-                #                       ))
-
                 oc.add(CreateCO(url=channelURL, title=Title, thumb=Thumb))
                                                       
         return oc
+
+####################################################################################################
+@route(PREFIX + '/getrecordings')
+def GetRecordings():
+
+        oc = ObjectContainer(title2=NAME, no_cache=True)
+
+        #Connect and Get list of recordings
+        resultsArray = socketClient('GetRecordings', '')
+        test = open(R('test.txt'), 'w')
+        test.write('This is a test\n')
+        test.close()
+        if DEBUG:
+                Log.Debug(resultsArray)
+        
+        return oc
+
 ####################################################################################################
 @route(PREFIX + '/CreateCO')
 def CreateCO(url, title, thumb, include_container=False):
@@ -108,6 +119,7 @@ def CreateCO(url, title, thumb, include_container=False):
                         rating_key = url,
                         key = Callback(CreateCO, url=url, title=title, thumb=thumb, include_container=True),
                         title = title,
+                        
                         duration = DURATION,
                         thumb=thumb,
                         items = [
