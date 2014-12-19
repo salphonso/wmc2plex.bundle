@@ -26,9 +26,10 @@
 		"default": "DLNA"
 	},
 	{
-		"id": "debug",
-		"type": "bool",
-		"label": "Debug",
-		"default": "false"
+		"id": "debug_level",
+		"type": "enum",
+		"label": "Debug Level",
+		"values": ["None","Normal","Verbose"],
+		"default": "Normal"
 	}
 ]

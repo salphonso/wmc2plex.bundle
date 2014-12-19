@@ -27,7 +27,7 @@ GETSTREAMINFO = 'IncludeStreamInfo'
 TIME_MIN = datetime.datetime(1900, 1, 1, 0, 0)
 TIME_T_REF = datetime.datetime(1970, 1, 1, 0, 0)
 EPGDAYS = int(Prefs['serverwmc_epg_days'])
-DEBUG = Prefs['debug']
+DEBUG = Prefs['debug_level']
 STREAMID = 0
 DURATION = 14400000
 
@@ -55,20 +55,21 @@ def MainMenu():
 	oc.add(PrefsObject(title='Settings', thumb=R('icon-settings.png')))
 
 	#Channels
-	oc.add(DirectoryObject(key = Callback(ListChannels), title='Channels'))
+	oc.add(DirectoryObject(key = Callback(SubMenu, menu='Channels'), title='Channels'))
 	oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recordings'))
 
         return oc
 	
 ####################################################################################################
-@route(PREFIX +'/listchannels')
-def ListChannels():
+@route(PREFIX +'/submenu/{title}')
+def SubMenu(menu):
 
-        oc = ObjectContainer(title2=NAME, no_cache=True)
+        oc = ObjectContainer(title2=menu, no_cache=True)
 
         #Connect and Get Channel List
         resultsArray = socketClient('GetChannels', '')
-        if DEBUG:
+
+        if DEBUG=='Verbose':
                 Log.Debug(resultsArray)
 
         #Loop through resultsArray to build Channel objects
@@ -76,20 +77,25 @@ def ListChannels():
                 channelArray = result.split('|')
                 channelID = channelArray[0]
                 try:
-                        channelImageFile = 'file://' + channelArray[5].split('@')[-1] #channelArray[5].split('/')[-1]
+                        channelImageFile = channelArray[5].split('/')[-1] #'file://' + channelArray[5].split('@')[-1]
                 except:
                         channelImageFile = ''
                 channelNumber = channelArray[2]
                 channelName = channelArray[8]
-                Title = channelName + '(' + channelNumber + ')'
+                channelTitle = channelName + '(' + channelNumber + ')'
                 channelURL = channelArray[9]
                 Thumb = channelImageFile
-                if DEBUG:
+                progData = getChannelInfo(chID=channelID, progItem='programName', nowPlaying=True)
+                progData = progData + ' : ' + getChannelInfo(chID=channelID, progItem='programOverview', nowPlaying=True)
+                Summary='Now Playing : ' + progData
+
+                if DEBUG=='Normal' or DEBUG=='Verbose':
                         Log.Debug(channelImageFile + ' - ' + channelArray[5])
-                        Log.Debug(Title + ', ' + channelURL + ', ' + channelImageFile + ', '
+                        Log.Debug(channelTitle + ', ' + channelURL + ', ' + channelImageFile + ', '
                                   + channelNumber + ', ' + channelName)
 
-                oc.add(CreateCO(url=channelURL, title=Title, thumb=Thumb))
+                if menu=='Channels':
+                        oc.add(CreateCO(url=channelURL, title=channelTitle, summary=Summary, thumb=R(Thumb)))
                                                       
         return oc
 
@@ -97,29 +103,30 @@ def ListChannels():
 @route(PREFIX + '/getrecordings')
 def GetRecordings():
 
-        oc = ObjectContainer(title2=NAME, no_cache=True)
+        oc = ObjectContainer(title=NAME, no_cache=True)
 
         #Connect and Get list of recordings
         resultsArray = socketClient('GetRecordings', '')
         test = open(R('test.txt'), 'w')
         test.write('This is a test\n')
         test.close()
-        if DEBUG:
+
+        if DEBUG=='Normal' or DEBUG=='Verbose':
                 Log.Debug(resultsArray)
         
         return oc
 
 ####################################################################################################
 @route(PREFIX + '/CreateCO')
-def CreateCO(url, title, thumb, include_container=False):
+def CreateCO(url, title, summary, thumb, include_container=False):
 
         #check preferences for DLNA playback - *put in for future use currently uses DLNA no matter what*
         if Prefs['serverwmc_playback']=='DLNA':
                 co = VideoClipObject(
                         rating_key = url,
-                        key = Callback(CreateCO, url=url, title=title, thumb=thumb, include_container=True),
+                        key = Callback(CreateCO, url=url, title=title, summary=summary, thumb=thumb, include_container=True),
                         title = title,
-                        
+                        summary = summary,
                         duration = DURATION,
                         thumb=thumb,
                         items = [
@@ -137,8 +144,9 @@ def CreateCO(url, title, thumb, include_container=False):
         else:
                 co = VideoClipObject(
                         rating_key = url,
-                        key = Callback(CreateCO, url=url, title=title, thumb=thumb, include_container=True),
+                        key = Callback(CreateCO, url=url, title=title, summary=summary, thumb=thumb, include_container=True),
                         title = title,
+                        summary = summary,
                         duration = DURATION,
                         thumb=thumb,
                         items = [
@@ -154,7 +162,7 @@ def CreateCO(url, title, thumb, include_container=False):
                                 ]
                         )
 
-        if DEBUG:
+        if DEBUG=='Verbose':
                 Log.Debug(title + ', ' + url + ', ' + str(thumb))
 
         if include_container:
@@ -163,52 +171,74 @@ def CreateCO(url, title, thumb, include_container=False):
                 return co
 
 ####################################################################################################
-@route(PREFIX + '/ChannelInfo')
-def ChannelInfo(ID, progItem):
+
+def getChannelInfo(chID, progItem, nowPlaying=False):
         
-        oc = ObjectContainer(title2=NAME)
         #Get Start and end datetime and convert to seconds
         startDt = getTime(datetime.datetime.utcnow())
         endDt = int(startDt + (timedelta(days=(EPGDAYS))).total_seconds())
  
         #build request string
-        sendCommand = 'GetEntries|{0}|{1}|{2}'.format(ID, startDt, endDt)
+        sendCommand = 'GetEntries|{0}|{1}|{2}'.format(chID, startDt, endDt)
 
         #Connect and get channel/program info
         resultsArray = socketClient(sendCommand, '')
-        Log.Debug('Request sent: ' + sendCommand)
-        #Loop through results array and build Channel info objects
-        for result in resultsArray:
-                infoArray = result.split('|')
-                programID = infoArray[0] + '-' + infoArray[16]
-                programName = infoArray[1]
-                programStartDt = infoArray[3]
-                programEndDt = infoArray[4]
-                programOverview = infoArray[5]
-                programImage = infoArray[14]
-                programEpisodeTitle = infoArray[15]
-                try:
-                        programRating = getRating(infoArray[8])
-                except:
-                        programRating = 'NR'
-                if DEBUG:
-                        Log.Debug(programID + ',' + programName + ',' + programStartDt + ',' + programEndDt +
-                                 ',' + programOverview + ',' + programRating)
 
-                progItem = { 'programID' : programID,
-                             'programName' : programName,
-                             'programStartDt' : programStartDt,
-                             'programEndDt' : programEndDt,
-                             'programOverview' : programOverview,
-                             'programImage' : programImage,
-                             'programEpisodeTitle' : programEpisodeTitle
-                             }
-        
-        return progItem
+        if DEBUG=='Normal' or DEBUG=='Verbose':
+                Log.Debug('Request sent: ' + sendCommand)
+        if DEBUG=='Verbose':
+                Log.Debug(resultsArray)
+
+        #Loop through results array and build Channel info objects
+        count = 0
+        for result in resultsArray:
+                count = count+1
+                infoArray = result.split('|')
+                #only get no playing item
+                if count==1 and nowPlaying:                        
+                        programID = infoArray[0] + '-' + infoArray[16]
+                        programName = infoArray[1]
+                        programStartDt = infoArray[3]
+                        programEndDt = infoArray[4]
+                        programOverview = infoArray[5]
+                        programImage = infoArray[14]
+                        programEpisodeTitle = infoArray[15]
+                        try:
+                                programRating = getRating(infoArray[8])
+                        except:
+                                programRating = 'NR'
+
+                        if DEBUG=='Verbose':
+                                Log.Debug(programID + ',' + programName + ',' + programStartDt + ',' + programEndDt +
+                                         ',' + programOverview + ',' + programRating)
+
+                        if progItem=='programID' : progData=programID,
+                        elif progItem=='programName' : progData=programName,
+                        elif progItem=='programStartDt' : progData=programStartDt,
+                        elif progItem=='programEndDt' : progData=programEndDt,
+                        elif progItem=='programOverview' : progData=programOverview,
+                        elif progItem=='programImage' : progData=programImage,
+                        elif progItem=='programEpisodeTitle' : progData=programEpisodeTitle
+                        else : progItem = ''
+                        break
+                else:
+                        progData = ''
+                        break
+
+        progData = str(progData[0])
+
+        if DEBUG=='Normal' or DEBUG=='Verbose':
+                        Log.Debug(progData)
+
+        if nowPlaying:                       
+                return progData
+        else:
+                return progData
 
 ####################################################################################################
 @route(PREFIX + '/getChannelStream')
 def getChannelStream(channelID):
+
         #Build channel stream variables
         channelStream = ''
         streamID = createStreamID(STREAMID)
@@ -217,23 +247,27 @@ def getChannelStream(channelID):
         command = "OpenLiveStream|" + channelID + "|" + GETSTREAMINFO
 
         #connect and retrieve channel stream path
-        Log.Debug('START STREAM -----------------------------------------------------------')
+        if DEBUG=='Normal' or DEBUG=='Verbose':
+                Log.Debug('START STREAM -----------------------------------------------------------')
+                
         responses = socketClient(command, streamID)
         for response in responses:
                 streamArray = response.split(',')
                 channelStream = streamArray[0]
-        if DEBUG:
+
+        if DEBUG=='Verbose':
                 Log.Debug(channelStream)
      
         return channelStream
 
 ####################################################################################################
 def closeChannelStream(streamID):
+
         #Close Stream
         command = "CloseLiveStream"
-        channelStream = socketClient(command, streamID)  
+        channelStream = socketClient(command, streamID)
+        
 ####################################################################################################
-
 @route(PREFIX + '/GetInfo')
 def GetInfo():
 	Log.Debug(str(Request.Headers))
@@ -257,8 +291,10 @@ def socketClient(command, streamID):
         try:
                 #Connect to endpoint
                 sock.connect(SERVERWMC_ADDR)
-                Log.Debug('Connection to ' + ''.join(SERVERWMC_IP) + ':'
-                          + ''.join(SERVERWMC_PORT) + ' ServerWMC successfull.')
+
+                if DEBUG=='Normal' or DEBUG=='Verbose':
+                        Log.Debug('Connection to ' + ''.join(SERVERWMC_IP) + ':'
+                                  + ''.join(SERVERWMC_PORT) + ' ServerWMC successfull.')
                 
                 #build request string - switch Mediabrowser to Plex when done
                 sendCommand = 'Plex^@{1}@{2}|{0}<Client Quit>'.format(command, MACHINENAME, streamID)
@@ -282,7 +318,7 @@ def socketClient(command, streamID):
                 if response.endswith('<EOL>'):
                         response = response[:-5]
  
-                if DEBUG:
+                if DEBUG=='Verbose':
                         Log.Debug('Recieved: {0}'.format(response))
 
                 #Convert response string to array
