@@ -56,7 +56,7 @@ def MainMenu():
 
 	#Channels
 	oc.add(DirectoryObject(key = Callback(SubMenu, menu='Channels'), title='Channels'))
-	oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recordings'))
+	oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recordings'))#used for testing, not functional
 
         return oc
 	
@@ -85,9 +85,9 @@ def SubMenu(menu):
                 channelTitle = channelName + '(' + channelNumber + ')'
                 channelURL = channelArray[9]
                 Thumb = channelImageFile
-                progData = getChannelInfo(chID=channelID, progItem='programName', nowPlaying=True)
-                progData = progData + ' : ' + getChannelInfo(chID=channelID, progItem='programOverview', nowPlaying=True)
-                Summary='Now Playing : ' + progData
+                summaryData = getChannelInfo(chID=channelID, progItem='programName', infoType='nowPlaying')
+                summaryData = summaryData + ' : ' + getChannelInfo(chID=channelID, progItem='programOverview', infoType='nowPlaying')
+                Summary='Now Playing : ' + summaryData
 
                 if DEBUG=='Normal' or DEBUG=='Verbose':
                         Log.Debug(channelImageFile + ' - ' + channelArray[5])
@@ -95,36 +95,88 @@ def SubMenu(menu):
                                   + channelNumber + ', ' + channelName)
 
                 if menu=='Channels':
-                        oc.add(CreateCO(url=channelURL, title=channelTitle, summary=Summary, thumb=R(Thumb)))
+                        oc.add(CreateCO(url=channelURL, chID=channelID, title=channelTitle, summary=Summary, thumb=R(Thumb)))
                                                       
         return oc
 
 ####################################################################################################
-@route(PREFIX + '/getrecordings')
-def GetRecordings():
+@route(PREFIX + '/CreateCO')
+def CreateCO(url, chID, title, summary, thumb):
 
-        oc = ObjectContainer(title=NAME, no_cache=True)
+        #check preferences for DLNA playback - *put in for future use currently uses DLNA no matter what*
+        co = TVShowObject(
+                rating_key = url,
+                key = Callback(CreateChannel, url=url, chID=chID, title=title, summary=summary, thumb=thumb),
+                title = title,
+                summary = summary,
+                thumb = thumb
+                )
 
-        #Connect and Get list of recordings
-        resultsArray = socketClient('GetRecordings', '')
-        test = open(R('test.txt'), 'w')
-        test.write('This is a test\n')
-        test.close()
+        if DEBUG=='Verbose':
+                Log.Debug(title + ', ' + url + ', ' + str(thumb))
+
+        return co
+
+####################################################################################################
+@route(PREFIX + '/CreateChannel')
+def CreateChannel(url, chID, title, summary, thumb, include_container=False):
+
+        oc = ObjectContainer(title2=title, no_cache=True)
+
+        #Get Start and end datetime and convert to seconds
+        startDt = getTimeS(datetime.datetime.utcnow())
+        endDt = int(startDt + (timedelta(days=(EPGDAYS))).total_seconds())
+ 
+        #build request string
+        sendCommand = 'GetEntries|{0}|{1}|{2}'.format(chID, startDt, endDt)
+
+        #Connect and get channel/program info
+        resultsArray = socketClient(sendCommand, '')
 
         if DEBUG=='Normal' or DEBUG=='Verbose':
+                Log.Debug('Request sent: ' + sendCommand)
+        if DEBUG=='Verbose':
                 Log.Debug(resultsArray)
-        
+
+        #Loop through resultsArray to build Channel objects
+        for result in resultsArray:             
+                infoArray = result.split('|')
+                programID = infoArray[0] + '-' + infoArray[16]
+                programName = infoArray[1]
+                programStartDt = getDateTime(infoArray[3], start=True)
+                programEndDt = getDateTime(infoArray[4])
+                programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
+                programOverview = infoArray[5]
+                programImage = infoArray[14]
+                programEpisodeTitle = infoArray[15]
+                try:
+                        programRating = getRating(infoArray[8])
+                except:
+                        programRating = 'NR'
+                programName = programAirTime + programName
+
+                if DEBUG=='Verbose':
+                        Log.Debug(programID + ',' + programName + ',' + programStartDt + ',' + programEndDt +
+                                ',' + programOverview + ',' + programRating)
+                oc.add(
+                        CreateEO(
+                                url=url,
+                                title=programName,
+                                summary=programOverview,
+                                thumb=programImage
+                                ))               
+                                                      
         return oc
 
 ####################################################################################################
-@route(PREFIX + '/CreateCO')
-def CreateCO(url, title, summary, thumb, include_container=False):
+@route(PREFIX + '/CreateEO/{title}')
+def CreateEO(url, title, summary, thumb, include_container=False):
 
-        #check preferences for DLNA playback - *put in for future use currently uses DLNA no matter what*
+        #check preferences for DLNA playback - *put in for future use, currently uses DLNA no matter what*
         if Prefs['serverwmc_playback']=='DLNA':
-                co = VideoClipObject(
-                        rating_key = url,
-                        key = Callback(CreateCO, url=url, title=title, summary=summary, thumb=thumb, include_container=True),
+                eo = EpisodeObject(
+                        rating_key = title,
+                        key = Callback(CreateEO, url=url, title=title, summary=summary, thumb=thumb, include_container=True),
                         title = title,
                         summary = summary,
                         duration = DURATION,
@@ -142,9 +194,9 @@ def CreateCO(url, title, summary, thumb, include_container=False):
                                 ]
                         )
         else:
-                co = VideoClipObject(
-                        rating_key = url,
-                        key = Callback(CreateCO, url=url, title=title, summary=summary, thumb=thumb, include_container=True),
+                eo = EpisodeObject(
+                        rating_key = title,
+                        key = Callback(CreateEO, url=url, title=title, summary=summary, thumb=thumb, include_container=True),
                         title = title,
                         summary = summary,
                         duration = DURATION,
@@ -166,16 +218,17 @@ def CreateCO(url, title, summary, thumb, include_container=False):
                 Log.Debug(title + ', ' + url + ', ' + str(thumb))
 
         if include_container:
-                return ObjectContainer(objects=[co])
+                return ObjectContainer(objects=[eo])
+                Log.Debug('ADDED CONTAINER - ' + title)
         else:
-                return co
-
+                Log.Debug('ADDED OBJECT - ' + title)
+                return eo
+        
 ####################################################################################################
-
-def getChannelInfo(chID, progItem, nowPlaying=False):
+def getChannelInfo(chID, progItem, infoType='Upcoming'):
         
         #Get Start and end datetime and convert to seconds
-        startDt = getTime(datetime.datetime.utcnow())
+        startDt = getTimeS(datetime.datetime.utcnow())
         endDt = int(startDt + (timedelta(days=(EPGDAYS))).total_seconds())
  
         #build request string
@@ -195,11 +248,12 @@ def getChannelInfo(chID, progItem, nowPlaying=False):
                 count = count+1
                 infoArray = result.split('|')
                 #only get no playing item
-                if count==1 and nowPlaying:                        
+                if count==1 and infoType=='nowPlaying':                        
                         programID = infoArray[0] + '-' + infoArray[16]
                         programName = infoArray[1]
-                        programStartDt = infoArray[3]
-                        programEndDt = infoArray[4]
+                        programStartDt = getDateTime(infoArray[3], start=True)
+                        programEndDt = getDateTime(infoArray[4])
+                        programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
                         programOverview = infoArray[5]
                         programImage = infoArray[14]
                         programEpisodeTitle = infoArray[15]
@@ -207,6 +261,7 @@ def getChannelInfo(chID, progItem, nowPlaying=False):
                                 programRating = getRating(infoArray[8])
                         except:
                                 programRating = 'NR'
+                        programName = programAirTime + programName
 
                         if DEBUG=='Verbose':
                                 Log.Debug(programID + ',' + programName + ',' + programStartDt + ',' + programEndDt +
@@ -221,19 +276,68 @@ def getChannelInfo(chID, progItem, nowPlaying=False):
                         elif progItem=='programEpisodeTitle' : progData=programEpisodeTitle
                         else : progItem = ''
                         break
-                else:
-                        progData = ''
+                elif count==2 and infoType=='upNext':
+                        programID = infoArray[0] + '-' + infoArray[16]
+                        programName = infoArray[1]
+                        programStartDt = getDateTime(infoArray[3], start=True)
+                        programEndDt = getDateTime(infoArray[4])
+                        programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
+                        programOverview = infoArray[5]
+                        programImage = infoArray[14]
+                        programEpisodeTitle = infoArray[15]
+                        try:
+                                programRating = getRating(infoArray[8])
+                        except:
+                                programRating = 'NR'
+                        programName = programAirTime + programName
+
+                        if DEBUG=='Verbose':
+                                Log.Debug(programID + ',' + programName + ',' + programStartDt + ',' + programEndDt +
+                                         ',' + programOverview + ',' + programRating)
+
+                        if progItem=='programID' : progData=programID,
+                        elif progItem=='programName' : progData=programName,
+                        elif progItem=='programStartDt' : progData=programStartDt,
+                        elif progItem=='programEndDt' : progData=programEndDt,
+                        elif progItem=='programOverview' : progData=programOverview,
+                        elif progItem=='programImage' : progData=programImage,
+                        elif progItem=='programEpisodeTitle' : progData=programEpisodeTitle
+                        else : progItem = ''
                         break
+                elif count>2:
+                        break
+                else:
+                        pass
 
         progData = str(progData[0])
 
         if DEBUG=='Normal' or DEBUG=='Verbose':
                         Log.Debug(progData)
 
-        if nowPlaying:                       
+        if infoType=='nowPlaying' or infoType=='upNext':                       
                 return progData
         else:
                 return progData
+
+####################################################################################################
+@route(PREFIX + '/getrecordings')
+def GetRecordings():
+
+        oc = ObjectContainer(title2='Recordings', no_cache=True)
+
+        #Connect and Get list of recordings
+        resultsArray = socketClient('GetRecordings', '')
+
+        fn = R('test.txt')
+        Log.Debug('====================File :' + str(fn))
+        test = os.open(fn, os.O_RDWR|os.O_TRUNC|os.O_CREAT)
+        os.write(test, 'This is a test.')
+        os.close(test)
+
+        if DEBUG=='Normal' or DEBUG=='Verbose':
+                Log.Debug(resultsArray)
+        
+        return oc
 
 ####################################################################################################
 @route(PREFIX + '/getChannelStream')
@@ -347,11 +451,29 @@ def getRating(rating):
         return rating
 
 ####################################################################################################
-def getTime(time):
+def getTimeS(time):
 
         time_t = time.replace(microsecond=0)
         time_t = time_t - TIME_T_REF
         time_t = int(time_t.total_seconds())
+
+        return time_t
+
+####################################################################################################
+def getDateTime(time, start=False):
+
+        today = datetime.datetime.utcnow()
+        today = today.strftime('%d')
+        time_t = timedelta(seconds=int(time))
+        time_t = TIME_T_REF + time_t
+        time_tDay = time_t.strftime('%d')
+        if today == time_tDay:
+                time_t = time_t.strftime('%I:%M')
+        else:
+                if start==True:
+                        time_t = time_t.strftime('%m/%d %I:%M')
+                else:
+                        time_t = time_t.strftime('%I:%M')
 
         return time_t
 
