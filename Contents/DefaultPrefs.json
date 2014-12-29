@@ -1,0 +1,35 @@
+[
+	{
+		"id": "serverwmc_ip",
+		"type": "text",
+		"label": "ServerWMC IP",
+		"default": "localhost"
+	},
+	{
+		"id": "serverwmc_port",
+		"type": "text",
+		"label": "ServerWMC Port",
+		"default": "9080"
+	},
+	{
+		"id": "serverwmc_epg_days",
+		"type": "enum",
+		"label": "Days of EPG Data",
+		"values": ["1","2","3","4","5","6","7"],
+		"default": "7"
+	},
+	{
+		"id": "serverwmc_playback",
+		"type": "enum",
+		"label": "Playback preference",
+		"values": ["File","DLNA"],
+		"default": "DLNA"
+	},
+	{
+		"id": "debug_level",
+		"type": "enum",
+		"label": "Debug Level",
+		"values": ["None","Normal","Verbose"],
+		"default": "Normal"
+	}
+]
