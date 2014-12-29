@@ -2,7 +2,7 @@
 # project: wmc2plex plugin
 # description: Plugin for Plex to allow viewing of liveTV, EPG, and the scheduling/viewing of
 #             recordings via ServerWMC
-# Author : Scott Alphonso
+# Author : Scott Alphonso ---
 # Credits: Thank you KrustyReturns(Vic) for creating ServerWMC and the help with creating this plugin
 ####################################################################################################
 
