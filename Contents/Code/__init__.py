@@ -58,7 +58,7 @@ def MainMenu():
 
         # Channels
         oc.add(DirectoryObject(key = Callback(SubMenu, menu='Channels'), title='Channels'))
-        oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recordings'))  # used for testing, not functional
+        #oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recordings'))  # used for testing, not functional
 
         return oc
 	
