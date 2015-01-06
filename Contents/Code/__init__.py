@@ -107,19 +107,34 @@ def SubMenu(menu):
 def CreateCO(url, chID, title, summary, thumb, container=False):
 
         # check preferences for DLNA playback - *put in for future use currently uses DLNA no matter what*
-        co = SeasonObject(
+        co = VideoClipObject(
                 rating_key=url,
-                key=Callback(CreateChannel, url=url, chID=chID, title=title, summary=summary, thumb=thumb),
+                key=Callback(CreateCO, url=url, chID=chID, title=title, summary=summary, thumb=thumb, container=True),
                 title=title,
                 summary=summary,
-                thumb=thumb
+                duration=DURATION,
+                thumb=thumb,
+                items = [
+			            MediaObject(
+                                parts = [PartObject(key=(url))],
+                                container = "mpegts",
+                                video_resolution = 1080,
+                                bitrate = 20000,
+                                video_codec = "mpeg2video",
+                                audio_codec = "AC3",
+                                optimized_for_streaming = True
+                                )
+                        ]
                 )
 
         if DEBUG == 'Verbose':
                 Log.Debug('----------CreateCO Function----------')
                 Log.Debug(title + ', ' + url + ', ' + str(thumb))
 
-        return co
+        if container:
+                return ObjectContainer(objects=[co])
+        else:
+                return co
 
 ####################################################################################################
 @route(PREFIX + '/CreateChannel')
