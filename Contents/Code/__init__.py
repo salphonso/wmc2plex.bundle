@@ -19,7 +19,7 @@ ART = 'art-default.jpg'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, 9080)
-VERSION = '0.3.1'
+VERSION = '0.4.0'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -98,46 +98,14 @@ def SubMenu(menu):
                                   + channelNumber + ', ' + channelName)
 
                 if menu=='Channels':
-                        oc.add(CreateCO(url=channelURL, chID=channelID, title=channelTitle, summary=Summary, thumb=R(Thumb)))
-                                                      
+                        oc.add(DirectoryObject(key=Callback(
+                                CreateChannel, url=channelURL, chID=channelID, title=channelTitle, summary=Summary, thumb=R(Thumb)),
+                                title=channelTitle, summary=Summary, thumb=R(Thumb)))
+
         return oc
 
 ####################################################################################################
-@route(PREFIX + '/CreateCO')
-def CreateCO(url, chID, title, summary, thumb, container=False):
-
-        # check preferences for DLNA playback - *put in for future use currently uses DLNA no matter what*
-        co = VideoClipObject(
-                rating_key=url,
-                key=Callback(CreateCO, url=url, chID=chID, title=title, summary=summary, thumb=thumb, container=True),
-                title=title,
-                summary=summary,
-                duration=DURATION,
-                thumb=thumb,
-                items = [
-			            MediaObject(
-                                parts = [PartObject(key=(url))],
-                                container = "mpegts",
-                                video_resolution = 1080,
-                                bitrate = 20000,
-                                video_codec = "mpeg2video",
-                                audio_codec = "AC3",
-                                optimized_for_streaming = True
-                                )
-                        ]
-                )
-
-        if DEBUG == 'Verbose':
-                Log.Debug('----------CreateCO Function----------')
-                Log.Debug(title + ', ' + url + ', ' + str(thumb))
-
-        if container:
-                return ObjectContainer(objects=[co])
-        else:
-                return co
-
-####################################################################################################
-@route(PREFIX + '/CreateChannel')
+@route(PREFIX + '/CreateChannel/{title}')
 def CreateChannel(url, chID, title, summary, thumb, include_container=False):
 
         oc = ObjectContainer(title2=title, no_cache=True)
@@ -180,7 +148,7 @@ def CreateChannel(url, chID, title, summary, thumb, include_container=False):
                                 ',' + programOverview + ',' + programRating)
                 if getDateTime(startDt) >= programStartDt <= programEndDt:
                         oc.add(
-                                CreateEO(
+                                CreateVO(
                                         url=url,
                                         title=programName,
                                         summary=programOverview,
@@ -189,7 +157,7 @@ def CreateChannel(url, chID, title, summary, thumb, include_container=False):
                                         ))
                 else:
                         oc.add(
-                                CreateEO(
+                                CreateVO(
                                         url=url,
                                         title=programName,
                                         summary=programOverview,
@@ -199,15 +167,15 @@ def CreateChannel(url, chID, title, summary, thumb, include_container=False):
         return oc
 
 ####################################################################################################
-@route(PREFIX + '/CreateEO')
-def CreateEO(url, title, summary, thumb, nowPlaying=False):
+@route(PREFIX + '/CreateVO/{title}')
+def CreateVO(url, title, summary, thumb, nowPlaying=False, container=False):
 
         # check preferences for DLNA playback - *put in for future use, currently uses DLNA no matter what*
         if Prefs['serverwmc_playback']=='DLNA':
                 if nowPlaying:
-                        eo = EpisodeObject(
+                        vo = VideoClipObject(
                                 rating_key=title,
-                                key=Callback(CreateEO, url=url, title=title, summary=summary, thumb=thumb),
+                                key=Callback(CreateVO, url=url, title=title, summary=summary, thumb=thumb, container=True),
                                 title=title,
                                 summary=summary,
                                 duration=DURATION,
@@ -225,9 +193,9 @@ def CreateEO(url, title, summary, thumb, nowPlaying=False):
                                         ]
                                 )
                 else:
-                        eo = EpisodeObject(
+                        vo = VideoClipObject(
                                 rating_key=title,
-                                key=Callback(CreateEO, url=url, title=title, summary=summary, thumb=thumb),
+                                key=Callback(CreateVO, url=url, title=title, summary=summary, thumb=thumb, container=True),
                                 title=title,
                                 summary=summary,
                                 duration=DURATION,
@@ -248,10 +216,13 @@ def CreateEO(url, title, summary, thumb, nowPlaying=False):
                 pass  # place holder for future use
 
         if DEBUG == 'Verbose':
-                Log.Debug('----------CreateEO Function----------')
+                Log.Debug('----------CreateVO Function----------')
                 Log.Debug(title + ', ' + url + ', ' + str(thumb))
 
-        return eo
+        if container:
+                return ObjectContainer(objects=[vo])
+        else:
+                return vo
         
 ####################################################################################################
 def getChannelInfo(chID, progItem, infoType='Upcoming'):
@@ -468,11 +439,6 @@ def socketClient(command, streamID):
                 sock.close()
 
         return resultsArray
-
-####################################################################################################
-@indirect
-def playVideo(url):
-        return IndirectResponse(VideoClipObject, key=url)
 
 ####################################################################################################
 def getRating(rating):
