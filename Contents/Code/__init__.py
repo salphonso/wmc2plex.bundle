@@ -19,7 +19,7 @@ ART = 'art-default.jpg'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, 9080)
-VERSION = '0.4.0'
+VERSION = '0.4.1'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -57,13 +57,13 @@ def MainMenu():
         oc.add(PrefsObject(title='Settings', thumb=R('icon-settings.png')))
 
         # Channels
-        oc.add(DirectoryObject(key = Callback(SubMenu, menu='Channels'), title='Channels'))
-        #oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recordings'))  # used for testing, not functional
+        oc.add(DirectoryObject(key = Callback(SubMenu, menu='Channels'), title='Channels', thumb=R(ART)))
+        #oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recordings'))
 
         return oc
 	
 ####################################################################################################
-@route(PREFIX +'/submenu/{title}')
+@route(PREFIX +'/SubMenu/{title}')
 def SubMenu(menu):
 
         oc = ObjectContainer(title2=menu, no_cache=True)
@@ -81,8 +81,10 @@ def SubMenu(menu):
                 channelID = channelArray[0]
                 try:
                         channelImageFile = channelArray[5].split('/')[-1]  # 'file://' + channelArray[5].split('@')[-1]
+                        if channelImageFile=='':
+                                channelImageFile = ART
                 except:
-                        channelImageFile = ''
+                        channelImageFile = ART
                 channelNumber = channelArray[2]
                 channelName = channelArray[8]
                 channelTitle = channelName + '(' + channelNumber + ')'
@@ -99,14 +101,14 @@ def SubMenu(menu):
 
                 if menu=='Channels':
                         oc.add(DirectoryObject(key=Callback(
-                                CreateChannel, url=channelURL, chID=channelID, title=channelTitle, summary=Summary, thumb=R(Thumb)),
+                                CreateChannel, url=channelURL, chID=channelID, title=channelTitle, thumb=R(Thumb)),
                                 title=channelTitle, summary=Summary, thumb=R(Thumb)))
 
         return oc
 
 ####################################################################################################
-@route(PREFIX + '/CreateChannel/{title}')
-def CreateChannel(url, chID, title, summary, thumb, include_container=False):
+@route(PREFIX + '/CreateChannel/{chID}')
+def CreateChannel(url, chID, title, thumb):
 
         oc = ObjectContainer(title2=title, no_cache=True)
 
@@ -120,8 +122,6 @@ def CreateChannel(url, chID, title, summary, thumb, include_container=False):
         # Connect and get channel/program info
         resultsArray = socketClient(sendCommand, '')
 
-        if DEBUG=='Normal' or DEBUG=='Verbose':
-                Log.Debug('Request sent: ' + sendCommand)
         if DEBUG=='Verbose':
                 Log.Debug('----------CreateChannel Function----------')
                 Log.Debug(resultsArray)
@@ -131,11 +131,16 @@ def CreateChannel(url, chID, title, summary, thumb, include_container=False):
                 infoArray = result.split('|')
                 programID = infoArray[0] + '-' + infoArray[16]
                 programName = infoArray[1]
-                programStartDt = getDateTime(infoArray[3], start=True)
-                programEndDt = getDateTime(infoArray[4])
-                programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
+                programStartDt24 = getDateTime24(infoArray[3], start=True)
+                programEndDt24 = getDateTime24(infoArray[4])
+                programStartDt12 = getDateTime12(infoArray[3], start=True)
+                programEndDt12 = getDateTime12(infoArray[4])
+                programAirTime = '(' + programStartDt12 + ' - ' + programEndDt12 + ') '
                 programOverview = infoArray[5]
-                programImage = infoArray[14]
+                if infoArray[14]=='None':
+                        programImage = R(thumb)
+                else:
+                        programImage = infoArray[14]
                 programEpisodeTitle = infoArray[15]
                 try:
                         programRating = getRating(infoArray[8])
@@ -144,12 +149,13 @@ def CreateChannel(url, chID, title, summary, thumb, include_container=False):
                 programName = programAirTime + programName
 
                 if DEBUG=='Verbose':
-                        Log.Debug(programID + ',' + programName + ',' + programStartDt + ',' + programEndDt +
+                        Log.Debug(programID + ',' + programName + ',' + programStartDt24 + ',' + programEndDt24 +
                                 ',' + programOverview + ',' + programRating)
-                if getDateTime(startDt) >= programStartDt <= programEndDt:
+                if programStartDt24 <= getDateTime24(startDt) <= programEndDt24:
                         oc.add(
-                                CreateVO(
+                                CreatePO(
                                         url=url,
+                                        chID=chID,
                                         title=programName,
                                         summary=programOverview,
                                         thumb=programImage,
@@ -157,25 +163,26 @@ def CreateChannel(url, chID, title, summary, thumb, include_container=False):
                                         ))
                 else:
                         oc.add(
-                                CreateVO(
+                                CreatePO(
                                         url=url,
+                                        chID=chID,
                                         title=programName,
                                         summary=programOverview,
                                         thumb=programImage
                                         ))
-                                                              
+
         return oc
 
 ####################################################################################################
-@route(PREFIX + '/CreateVO/{title}')
-def CreateVO(url, title, summary, thumb, nowPlaying=False, container=False):
+@route(PREFIX + '/CreatePO/{chID}')
+def CreatePO(url, chID, title, summary, thumb, nowPlaying=False, container=False):
 
         # check preferences for DLNA playback - *put in for future use, currently uses DLNA no matter what*
         if Prefs['serverwmc_playback']=='DLNA':
                 if nowPlaying:
-                        vo = VideoClipObject(
+                        po = VideoClipObject(
                                 rating_key=title,
-                                key=Callback(CreateVO, url=url, title=title, summary=summary, thumb=thumb, container=True),
+                                key=Callback(CreatePO, url=url, chID=chID, title=title, summary=summary, thumb=thumb, nowPlaying=True, container=True),
                                 title=title,
                                 summary=summary,
                                 duration=DURATION,
@@ -192,37 +199,26 @@ def CreateVO(url, title, summary, thumb, nowPlaying=False, container=False):
                                                 )
                                         ]
                                 )
+
                 else:
-                        vo = VideoClipObject(
-                                rating_key=title,
-                                key=Callback(CreateVO, url=url, title=title, summary=summary, thumb=thumb, container=True),
+                        po = DirectoryObject(
+                                key=Callback(recordProgram, title=title, summary=summary),
                                 title=title,
                                 summary=summary,
-                                duration=DURATION,
-                                thumb=thumb,
-                                items=[
-                                        MediaObject(
-                                                parts = [PartObject(key=url)],
-                                                container = 'mpegts',
-                                                video_resolution = 1080,
-                                                bitrate = 20000,
-                                                video_codec = 'mpeg2video',
-                                                audio_codec = 'AC3',
-                                                optimized_for_streaming = True
-                                                )
-                                        ]
+                                thumb=thumb
                                 )
+
         else:
                 pass  # place holder for future use
 
         if DEBUG == 'Verbose':
-                Log.Debug('----------CreateVO Function----------')
+                Log.Debug('----------CreatePO Function----------')
                 Log.Debug(title + ', ' + url + ', ' + str(thumb))
 
         if container:
-                return ObjectContainer(objects=[vo])
+                return ObjectContainer(objects=[po])
         else:
-                return vo
+                return po
         
 ####################################################################################################
 def getChannelInfo(chID, progItem, infoType='Upcoming'):
@@ -237,8 +233,6 @@ def getChannelInfo(chID, progItem, infoType='Upcoming'):
         # Connect and get channel/program info
         resultsArray = socketClient(sendCommand, '')
 
-        if DEBUG=='Normal' or DEBUG=='Verbose':
-                Log.Debug('Request sent: ' + sendCommand)
         if DEBUG=='Verbose':
                 Log.Debug('----------getChannelInfo Function----------')
                 Log.Debug(resultsArray)
@@ -252,8 +246,8 @@ def getChannelInfo(chID, progItem, infoType='Upcoming'):
                 if count==1 and infoType=='nowPlaying':                        
                         programID = infoArray[0] + '-' + infoArray[16]
                         programName = infoArray[1]
-                        programStartDt = getDateTime(infoArray[3], start=True)
-                        programEndDt = getDateTime(infoArray[4])
+                        programStartDt = getDateTime12(infoArray[3], start=True)
+                        programEndDt = getDateTime12(infoArray[4])
                         programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
                         programOverview = infoArray[5]
                         programImage = infoArray[14]
@@ -280,8 +274,8 @@ def getChannelInfo(chID, progItem, infoType='Upcoming'):
                 elif count==2 and infoType == 'upNext':
                         programID = infoArray[0] + '-' + infoArray[16]
                         programName = infoArray[1]
-                        programStartDt = getDateTime(infoArray[3], start=True)
-                        programEndDt = getDateTime(infoArray[4])
+                        programStartDt = getDateTime12(infoArray[3], start=True)
+                        programEndDt = getDateTime12(infoArray[4])
                         programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
                         programOverview = infoArray[5]
                         programImage = infoArray[14]
@@ -321,23 +315,37 @@ def getChannelInfo(chID, progItem, infoType='Upcoming'):
                 return progData
 
 ####################################################################################################
-@route(PREFIX + '/getrecordings')
+@route(PREFIX + '/GetRecordings')
 def GetRecordings():
 
         oc = ObjectContainer(title2='Recordings', no_cache=True)
 
         # Connect and Get list of recordings
         resultsArray = socketClient('GetRecordings', '')
+        for result in resultsArray:
+                infoArray = result.split('|')
+                programName = infoArray[1]
+                programURL = infoArray[2]
+                programSummary = infoArray[5]
+                programChannel = infoArray[6]
+                programImage = infoArray[7]
 
-        fn = R('test.txt')
-        Log.Debug('====================File :' + str(fn))
-        test = os.open(fn, os.O_RDWR|os.O_TRUNC|os.O_CREAT)
-        os.write(test, 'This is a test.')
-        os.close(test)
+                if DEBUG=='Verbose':
+                        Log.Debug(programName + ', ' + programSummary +', ' + programChannel + ', ' + programImage)
 
-        if DEBUG == 'Normal' or DEBUG == 'Verbose':
-                Log.Debug(resultsArray)
-        
+                oc.add(
+                        CreatePO(
+                                url=programImage,
+                                title=programName,
+                                summary=programSummary,
+                                thumb=programImage
+                        )
+                )
+
+                if DEBUG == 'Verbose':
+                        Log.Debug(resultsArray)
+                        Log.Debug(infoArray)
+
         return oc
 
 ####################################################################################################
@@ -365,6 +373,22 @@ def getChannelStream(channelID):
                 Log.Debug(channelStream)
      
         return channelStream
+
+####################################################################################################
+@route(PREFIX + '/recordProgram')
+def recordProgram(title, summary, record=False):
+
+        thumb='record_icon.png'
+        if record:
+                pass
+        else:
+                return DirectoryObject(
+                        key=Callback(recordProgram, title=title, summary=summary, thumb=R(thumb), record=True),
+                        title=title,
+                        summary=summary,
+                        thumb=R(thumb)
+                        )
+        #return ObjectContainer(header='RecordMe', message='Please Record Me!')
 
 ####################################################################################################
 def closeChannelStream(streamID):
@@ -401,7 +425,7 @@ def socketClient(command, streamID):
                         Log.Debug('Connection to ' + ''.join(SERVERWMC_IP) + ':'
                                   + ''.join(SERVERWMC_PORT) + ' ServerWMC successfull.')
                 
-                # build request string - switch Mediabrowser to Plex when done
+                # build request string
                 sendCommand = 'Plex^@{1}@{2}|{0}<Client Quit>'.format(command, MACHINENAME, streamID)
                 
                 # send command string to server
@@ -425,6 +449,7 @@ def socketClient(command, streamID):
  
                 if DEBUG=='Verbose':
                         Log.Debug('----------socketClient Function----------')
+                        Log.Debug('Send Command : {0}'.format(sendCommand))
                         Log.Debug('Recieved: {0}'.format(response))
 
                 # Convert response string to array
@@ -462,7 +487,7 @@ def getTimeS(time):
         return time_t
 
 ####################################################################################################
-def getDateTime(time, start=False):
+def getDateTime12(time, start=False):
 
         today = datetime.datetime.utcnow()
         today = today.strftime('%d')
@@ -477,6 +502,22 @@ def getDateTime(time, start=False):
                         time_t = time_t.strftime('%m/%d %I:%M')
                 else:
                         time_t = time_t.strftime('%I:%M')
+
+        return time_t
+
+####################################################################################################
+def getDateTime24(time, start=False):
+
+        today = datetime.datetime.utcnow()
+        today = today.strftime('%d')
+        time_t = timedelta(seconds=int(time))
+        time_t = TIME_T_REF + time_t
+        time_t = time_t + TZ_DIFF
+        time_tDay = time_t.strftime('%d')
+        if today == time_tDay:
+                time_t = time_t.strftime('%H:%M')
+        else:
+                time_t = time_t.strftime('%m/%d %H:%M')
 
         return time_t
 
@@ -499,3 +540,26 @@ def getTimeDif():
         if DEBUG == 'Verbose':
                 Log.Debug('----------TIME ZONE DIFF----------')
                 Log.Debug(TZ_DIFF)
+
+####################################################################################################
+class pvr_time_state(enumerate):
+
+        pvr_timer_state_new = 0         # @brief a new, unsaved timer
+        pvr_timer_state_scheduled = 1   # @brief the timer is scheduled for recording
+        pvr_timer_state_recording = 2   # @brieg the timer is currently recording
+        pvr_timer_state_completed = 3   # @brief the recording completed successfully
+        pvr_timer_state_aborted = 4     # @brief recording started, but was aborted
+        pvr_timer_state_cancelled = 5   # @bried the timer was scheduled, but cancelled
+        pvr_timer_state_conflict_ok = 6 # @brief the scheduled timer conflicts with another one but will be recorded
+        pvr_timer_state_conflict_nok = 7# @brief the scheduled timer conflicts with another one and won't be recorded
+        pvr_timer_state_error = 8       # @brief the timer is scheduled, but can't be recorded for some reason
+
+class recordingState_wmc(enumerate):
+
+        none = 0
+        scheduled = 1
+        initializing = 2
+        recording = 3
+        recorded = 4
+        deleted = 5
+
