@@ -16,10 +16,13 @@ import os.path
 PREFIX = '/video/wmc2plex'
 NAME = 'PlexWMC'
 ART = 'art-default.jpg'
+REC_ICON = 'record_icon.png'
+CHANNEL_THUMB = 'channels.jpg'
+TIMER_THUMB = 'timers.jpg'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, 9080)
-VERSION = '0.4.1'
+VERSION = '0.5.1'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -49,21 +52,21 @@ def MainMenu():
 
         GetInfo()
 
-        response = socketClient('GetServerVersion', '')
-                      
+        socketClient('GetServerVersion', '')
+
         oc = ObjectContainer(title1=NAME,no_cache=True)
 
         # Settings
         oc.add(PrefsObject(title='Settings', thumb=R('icon-settings.png')))
 
         # Channels
-        oc.add(DirectoryObject(key = Callback(SubMenu, menu='Channels'), title='Channels', thumb=R(ART)))
-        #oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recordings'))
+        oc.add(DirectoryObject(key = Callback(SubMenu, menu='Channels'), title='Channels', thumb=R(CHANNEL_THUMB)))
+        oc.add(DirectoryObject(key = Callback(GetTimers), title='Scheduled Recordings', thumb=R(TIMER_THUMB)))
 
         return oc
-	
+
 ####################################################################################################
-@route(PREFIX +'/SubMenu/{title}')
+@route(PREFIX +'/SubMenu/{menu}')
 def SubMenu(menu):
 
         oc = ObjectContainer(title2=menu, no_cache=True)
@@ -80,7 +83,7 @@ def SubMenu(menu):
                 channelArray = result.split('|')
                 channelID = channelArray[0]
                 try:
-                        channelImageFile = channelArray[5].split('/')[-1]  # 'file://' + channelArray[5].split('@')[-1]
+                        channelImageFile = channelArray[5].split('/')[-1]
                         if channelImageFile=='':
                                 channelImageFile = ART
                 except:
@@ -90,8 +93,8 @@ def SubMenu(menu):
                 channelTitle = channelName + '(' + channelNumber + ')'
                 channelURL = channelArray[9]
                 Thumb = channelImageFile
-                summaryData = getChannelInfo(chID=channelID, progItem='programName', infoType='nowPlaying')
-                summaryData = summaryData + ' : ' + getChannelInfo(chID=channelID, progItem='programOverview', infoType='nowPlaying')
+                summaryData = getListingInfo(chID=channelID, progItem='programName', infoType='nowPlaying')
+                summaryData = summaryData + ' : ' + getListingInfo(chID=channelID, progItem='programOverview', infoType='nowPlaying')
                 Summary='Now Playing : ' + summaryData
 
                 if DEBUG=='Normal' or DEBUG=='Verbose':
@@ -115,7 +118,7 @@ def CreateChannel(url, chID, title, thumb):
         # Get Start and end datetime and convert to seconds
         startDt = getTimeS(datetime.datetime.utcnow())
         endDt = int(startDt + (timedelta(days=EPGDAYS)).total_seconds())
- 
+
         # build request string
         sendCommand = 'GetEntries|{0}|{1}|{2}'.format(chID, startDt, endDt)
 
@@ -127,14 +130,14 @@ def CreateChannel(url, chID, title, thumb):
                 Log.Debug(resultsArray)
 
         # Loop through resultsArray to build Channel objects
-        for result in resultsArray:             
+        for result in resultsArray:
                 infoArray = result.split('|')
                 programID = infoArray[0] + '-' + infoArray[16]
                 programName = infoArray[1]
-                programStartDt24 = getDateTime24(infoArray[3], start=True)
+                programStartDt24 = getDateTime24(infoArray[3])
                 programEndDt24 = getDateTime24(infoArray[4])
-                programStartDt12 = getDateTime12(infoArray[3], start=True)
-                programEndDt12 = getDateTime12(infoArray[4])
+                programStartDt12 = getDateTime12(infoArray[3], format='datetime')
+                programEndDt12 = getDateTime12(infoArray[4], format='time')
                 programAirTime = '(' + programStartDt12 + ' - ' + programEndDt12 + ') '
                 programOverview = infoArray[5]
                 if infoArray[14]=='None':
@@ -146,43 +149,56 @@ def CreateChannel(url, chID, title, thumb):
                         programRating = getRating(infoArray[8])
                 except:
                         programRating = 'NR'
-                programName = programAirTime + programName
+                programTitle = programAirTime + programName
 
                 if DEBUG=='Verbose':
-                        Log.Debug(programID + ',' + programName + ',' + programStartDt24 + ',' + programEndDt24 +
+                        Log.Debug(programID + ',' + programTitle + ',' + programStartDt24 + ',' + programEndDt24 +
                                 ',' + programOverview + ',' + programRating)
                 if programStartDt24 <= getDateTime24(startDt) <= programEndDt24:
                         oc.add(
-                                CreatePO(
+                                CreateListing(
                                         url=url,
                                         chID=chID,
-                                        title=programName,
+                                        chName=title,
+                                        programID=programID,
+                                        title=programTitle,
+                                        name=programName,
                                         summary=programOverview,
+                                        startTime = infoArray[3],
+                                        endTime = infoArray[4],
                                         thumb=programImage,
                                         nowPlaying=True
                                         ))
                 else:
                         oc.add(
-                                CreatePO(
+                                CreateListing(
                                         url=url,
                                         chID=chID,
-                                        title=programName,
+                                        chName=title,
+                                        programID=programID,
+                                        title=programTitle,
+                                        name=programName,
                                         summary=programOverview,
+                                        startTime = infoArray[3],
+                                        endTime = infoArray[4],
                                         thumb=programImage
                                         ))
 
         return oc
 
 ####################################################################################################
-@route(PREFIX + '/CreatePO/{chID}')
-def CreatePO(url, chID, title, summary, thumb, nowPlaying=False, container=False):
+@route(PREFIX + '/CreateListing/{chID}')
+def CreateListing(url, chID, chName, programID, title, name, summary, thumb, startTime, endTime, nowPlaying=False, container=False):
 
         # check preferences for DLNA playback - *put in for future use, currently uses DLNA no matter what*
         if Prefs['serverwmc_playback']=='DLNA':
                 if nowPlaying:
-                        po = VideoClipObject(
+                        listing = VideoClipObject(
                                 rating_key=title,
-                                key=Callback(CreatePO, url=url, chID=chID, title=title, summary=summary, thumb=thumb, nowPlaying=True, container=True),
+                                key=Callback(CreateListing, url=url, chID=chID, chName=chName, programID=programID, title=title,
+                                             name=name, summary=summary, thumb=thumb, startTime=startTime, endTime=endTime,
+                                             nowPlaying=True, container=True
+                                ),
                                 title=title,
                                 summary=summary,
                                 duration=DURATION,
@@ -190,19 +206,21 @@ def CreatePO(url, chID, title, summary, thumb, nowPlaying=False, container=False
                                 items=[
                                         MediaObject(
                                                 parts = [PartObject(key=url)],
-                                                container = 'mpegts',
+                                                container = "mpegts",
                                                 video_resolution = 1080,
                                                 bitrate = 20000,
-                                                video_codec = 'mpeg2video',
-                                                audio_codec = 'AC3',
+                                                video_codec = "mpeg2video",
+                                                audio_codec = "AC3",
                                                 optimized_for_streaming = True
                                                 )
                                         ]
                                 )
 
                 else:
-                        po = DirectoryObject(
-                                key=Callback(recordProgram, title=title, summary=summary),
+                        listing = DirectoryObject(
+                                key=Callback(getProgramPage, chID=chID, chName=chName, programID=programID, title=title, name=name,
+                                             summary=summary, startTime=startTime, endTime=endTime
+                                ),
                                 title=title,
                                 summary=summary,
                                 thumb=thumb
@@ -212,21 +230,22 @@ def CreatePO(url, chID, title, summary, thumb, nowPlaying=False, container=False
                 pass  # place holder for future use
 
         if DEBUG == 'Verbose':
-                Log.Debug('----------CreatePO Function----------')
+                Log.Debug('----------CreateListing Function----------')
                 Log.Debug(title + ', ' + url + ', ' + str(thumb))
 
         if container:
-                return ObjectContainer(objects=[po])
+                return ObjectContainer(objects=[listing])
         else:
-                return po
-        
+                return listing
+
 ####################################################################################################
-def getChannelInfo(chID, progItem, infoType='Upcoming'):
-        
+def getListingInfo(chID, progItem, infoType='Upcoming', startDt='', endDt=''):
+
         # Get Start and end datetime and convert to seconds
-        startDt = getTimeS(datetime.datetime.utcnow())
-        endDt = int(startDt + (timedelta(days=EPGDAYS)).total_seconds())
- 
+        if infoType != 'singleItem':
+                startDt = getTimeS(datetime.datetime.utcnow())
+                endDt = int(startDt + (timedelta(days=EPGDAYS)).total_seconds())
+
         # build request string
         sendCommand = 'GetEntries|{0}|{1}|{2}'.format(chID, startDt, endDt)
 
@@ -234,7 +253,7 @@ def getChannelInfo(chID, progItem, infoType='Upcoming'):
         resultsArray = socketClient(sendCommand, '')
 
         if DEBUG=='Verbose':
-                Log.Debug('----------getChannelInfo Function----------')
+                Log.Debug('----------getListingInfo Function----------')
                 Log.Debug(resultsArray)
 
         # Loop through results array and build Channel info objects
@@ -242,12 +261,12 @@ def getChannelInfo(chID, progItem, infoType='Upcoming'):
         for result in resultsArray:
                 count += 1
                 infoArray = result.split('|')
-                # only get no playing item
-                if count==1 and infoType=='nowPlaying':                        
+                # only get now playing item
+                if count in (1,2) and infoType in ('nowPlaying', 'upNext'):
                         programID = infoArray[0] + '-' + infoArray[16]
                         programName = infoArray[1]
-                        programStartDt = getDateTime12(infoArray[3], start=True)
-                        programEndDt = getDateTime12(infoArray[4])
+                        programStartDt = getDateTime12(infoArray[3], format='datetime')
+                        programEndDt = getDateTime12(infoArray[4], format='time')
                         programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
                         programOverview = infoArray[5]
                         programImage = infoArray[14]
@@ -271,11 +290,11 @@ def getChannelInfo(chID, progItem, infoType='Upcoming'):
                         elif progItem == 'programEpisodeTitle' : progData=programEpisodeTitle
                         else : progItem = ''
                         break
-                elif count==2 and infoType == 'upNext':
+                elif infoType == 'singleItem':
                         programID = infoArray[0] + '-' + infoArray[16]
                         programName = infoArray[1]
-                        programStartDt = getDateTime12(infoArray[3], start=True)
-                        programEndDt = getDateTime12(infoArray[4])
+                        programStartDt = getDateTime12(infoArray[3], format='datetime')
+                        programEndDt = getDateTime12(infoArray[4], format='time')
                         programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
                         programOverview = infoArray[5]
                         programImage = infoArray[14]
@@ -309,42 +328,60 @@ def getChannelInfo(chID, progItem, infoType='Upcoming'):
         if DEBUG == 'Normal' or DEBUG == 'Verbose':
                         Log.Debug(progData)
 
-        if infoType == 'nowPlaying' or infoType == 'upNext':
-                return progData
-        else:
-                return progData
+        return progData
 
 ####################################################################################################
-@route(PREFIX + '/GetRecordings')
-def GetRecordings():
+@route(PREFIX + '/GetTimers')
+def GetTimers():
 
-        oc = ObjectContainer(title2='Recordings', no_cache=True)
+        oc = ObjectContainer(title2='Scheduled Recordings', no_cache=True)
 
         # Connect and Get list of recordings
-        resultsArray = socketClient('GetRecordings', '')
+        resultsArray = socketClient('GetTimers', '')
+
+        if DEBUG == 'Verbose':
+                Log.Debug('----------GetTimers----------')
+                Log.Debug(resultsArray)
         for result in resultsArray:
                 infoArray = result.split('|')
-                programName = infoArray[1]
-                programURL = infoArray[2]
-                programSummary = infoArray[5]
-                programChannel = infoArray[6]
-                programImage = infoArray[7]
+                timerID = infoArray[0]
+                chID = infoArray[1]
+                startDateTime = infoArray[2]
+                endDateTime = infoArray[3]
+                pvr_timer_state = infoArray[4]
+                if not 'series' in infoArray[5]:
+                        programName = infoArray[5]
+                else:
+                        programName = infoArray[5].split(':')[1]
+                programID = infoArray[15]
+                SeriesTimerID = infoArray[16]
+                programImage = getListingInfo(
+                        chID=chID, progItem='programImage', infoType='singleItem', startDt=startDateTime, endDt=endDateTime
+                )
 
-                if DEBUG=='Verbose':
-                        Log.Debug(programName + ', ' + programSummary +', ' + programChannel + ', ' + programImage)
+                if len(SeriesTimerID) > 1:
+                        programName = programName + ' (Series)'
 
-                oc.add(
-                        CreatePO(
-                                url=programImage,
-                                title=programName,
-                                summary=programSummary,
-                                thumb=programImage
-                        )
+                programInfo = '{0} - Airing : {1} - {2}'.format(
+                        programName,
+                        getDateTime12(startDateTime, format='datetime'),
+                        getDateTime12(endDateTime)
+                )
+
+                programSummary = getListingInfo(
+                        chID=chID, progItem='programOverview', infoType='singleItem', startDt=startDateTime, endDt=endDateTime
                 )
 
                 if DEBUG == 'Verbose':
-                        Log.Debug(resultsArray)
                         Log.Debug(infoArray)
+
+                oc.add(DirectoryObject(
+                        key=Callback(cancelTimer, timerID=timerID, programName=programInfo, startTime=startDateTime),
+                        title=programInfo,
+                        summary=programSummary,
+                        thumb=programImage
+                        )
+                )
 
         return oc
 
@@ -362,7 +399,7 @@ def getChannelStream(channelID):
         # connect and retrieve channel stream path
         if DEBUG == 'Normal' or DEBUG == 'Verbose':
                 Log.Debug('START STREAM -----------------------------------------------------------')
-                
+
         responses = socketClient(command, streamID)
         for response in responses:
                 streamArray = response.split(',')
@@ -371,24 +408,81 @@ def getChannelStream(channelID):
         if DEBUG == 'Verbose':
                 Log.Debug('----------getChannelStream Function----------')
                 Log.Debug(channelStream)
-     
+
         return channelStream
 
 ####################################################################################################
-@route(PREFIX + '/recordProgram')
-def recordProgram(title, summary, record=False):
+@route(PREFIX + '/getProgramPage')
+def getProgramPage(chID, chName, programID, title, name, summary, startTime, endTime):
 
-        thumb='record_icon.png'
-        if record:
-                pass
-        else:
-                return DirectoryObject(
-                        key=Callback(recordProgram, title=title, summary=summary, thumb=R(thumb), record=True),
-                        title=title,
-                        summary=summary,
-                        thumb=R(thumb)
-                        )
-        #return ObjectContainer(header='RecordMe', message='Please Record Me!')
+        oc = ObjectContainer(title2=title, no_cache=True)
+
+
+        oc.add(DirectoryObject(
+                key=Callback(recordProgram, chID=chID, chName=chName, programID=programID, name=name, startTime=startTime, endTime=endTime),
+                title=title,
+                summary=summary,
+                thumb=R(REC_ICON)
+                )
+        )
+
+
+        return oc
+
+####################################################################################################
+def recordProgram(chID, chName, programID, name, startTime, endTime):
+
+        command = 'SetTimer|{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}|{9}|{10}|{11}|{12}'.format(
+                '-1', # => epg based timer
+                chID, # Channel ID
+                startTime, # Start date and time of listing
+                endTime,  # End date and time of listing
+                str(pvr_time_state.pvr_timer_state_new),
+                name, # name of listing
+                '0',  #XBMc Priotiry (not used)
+                '2', # pre padding in minutes
+                '3',  # post padding in minutes
+                'false',  # XBMC bIsRepeating (not used)
+                getEntryID(programID=programID),  # ScheduleEntry ID
+                'False',  # force prepad bool
+                'False'   # force postpad bool
+        )
+
+        message = 'You have successfully scheduled {0} to be recorded on {1} at {2} on {3}.'.format(
+                name,
+                chName,
+                getDateTime12(startTime, format='time'),
+                getDateTime12(startTime, format='date')
+        )
+
+        responses = socketClient(command, '')
+        if DEBUG == 'Verbose':
+                Log.Debug('----------recordProgram----------')
+                Log.Debug('Send Command:' + command)
+                Log.Debug(responses)
+                Log.Debug(message)
+        return ObjectContainer(header='Recording', message=message)
+
+####################################################################################################
+def cancelTimer(timerID, programName, startTime):
+
+        command = 'CancelTimer|{0}'.format(
+                timerID
+        )
+
+        message = 'You have successfully cancelled the scheduled recording for {0} at {1} on {2}.'.format(
+        programName,
+        getDateTime12(startTime, format='time'),
+        getDateTime12(startTime, format='date')
+        )
+
+        responses = socketClient(command, '')
+        if DEBUG == 'Verbose':
+                Log.Debug('----------cancelTimer----------')
+                Log.Debug('Send Command:' + command)
+                Log.Debug(responses)
+                Log.Debug(message)
+        return ObjectContainer(header='Cancelled', message=message)
 
 ####################################################################################################
 def closeChannelStream(streamID):
@@ -487,28 +581,32 @@ def getTimeS(time):
         return time_t
 
 ####################################################################################################
-def getDateTime12(time, start=False):
+def getDateTime12(time, format='time'):
 
         today = datetime.datetime.utcnow()
+        today = today + TZ_DIFF
         today = today.strftime('%d')
         time_t = timedelta(seconds=int(time))
         time_t = TIME_T_REF + time_t
         time_t = time_t + TZ_DIFF
         time_tDay = time_t.strftime('%d')
-        if today == time_tDay:
-                time_t = time_t.strftime('%I:%M')
+        if today == time_tDay and format != 'date':
+                time_t = time_t.strftime('%I:%M %p')
         else:
-                if start:
-                        time_t = time_t.strftime('%m/%d %I:%M')
-                else:
-                        time_t = time_t.strftime('%I:%M')
+                if format=='datetime':
+                        time_t = time_t.strftime('%m/%d %I:%M %p')
+                elif format=='date':
+                        time_t = time_t.strftime('%m/%d')
+                elif format=='time':
+                        time_t = time_t.strftime('%I:%M %p')
 
         return time_t
 
 ####################################################################################################
-def getDateTime24(time, start=False):
+def getDateTime24(time):
 
         today = datetime.datetime.utcnow()
+        today = today + TZ_DIFF
         today = today.strftime('%d')
         time_t = timedelta(seconds=int(time))
         time_t = TIME_T_REF + time_t
@@ -542,6 +640,14 @@ def getTimeDif():
                 Log.Debug(TZ_DIFF)
 
 ####################################################################################################
+def getEntryID(programID):
+
+        entryID = programID.split('-')
+        entryID = entryID[0]
+        Log.Debug(entryID)
+        return entryID
+
+####################################################################################################
 class pvr_time_state(enumerate):
 
         pvr_timer_state_new = 0         # @brief a new, unsaved timer
@@ -554,6 +660,7 @@ class pvr_time_state(enumerate):
         pvr_timer_state_conflict_nok = 7# @brief the scheduled timer conflicts with another one and won't be recorded
         pvr_timer_state_error = 8       # @brief the timer is scheduled, but can't be recorded for some reason
 
+####################################################################################################
 class recordingState_wmc(enumerate):
 
         none = 0
@@ -562,4 +669,5 @@ class recordingState_wmc(enumerate):
         recording = 3
         recorded = 4
         deleted = 5
+
 
