@@ -26,6 +26,13 @@
 		"default": "DLNA"
 	},
 	{
+		"id": "serverwmc_quality",
+		"type": "enum",
+		"label": "Playback quality",
+		"values": ["1080","720","480"],
+		"default": "1080"
+	},
+	{
 		"id": "debug_level",
 		"type": "enum",
 		"label": "Debug Level",

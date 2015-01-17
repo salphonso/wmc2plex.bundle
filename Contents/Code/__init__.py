@@ -17,12 +17,13 @@ PREFIX = '/video/wmc2plex'
 NAME = 'PlexWMC'
 ART = 'art-default.jpg'
 REC_ICON = 'record_icon.png'
+PLAY_ICON = 'play_icon.png'
 CHANNEL_THUMB = 'channels.jpg'
 TIMER_THUMB = 'timers.jpg'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, 9080)
-VERSION = '0.5.1'
+VERSION = '0.6.0'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -31,6 +32,7 @@ TIME_T_REF = datetime.datetime(1970, 1, 1, 0, 0)
 TZ_DIFF = timedelta(seconds=0)
 EPGDAYS = int(Prefs['serverwmc_epg_days'])
 DEBUG = Prefs['debug_level']
+VID_QUALITY = Prefs['serverwmc_quality']
 STREAMID = 0
 DURATION = 14400000
 
@@ -188,32 +190,18 @@ def CreateChannel(url, chID, title, thumb):
 
 ####################################################################################################
 @route(PREFIX + '/CreateListing/{chID}')
-def CreateListing(url, chID, chName, programID, title, name, summary, thumb, startTime, endTime, nowPlaying=False, container=False):
+def CreateListing(url, chID, chName, programID, title, name, summary, thumb, startTime, endTime, nowPlaying=False):
 
         # check preferences for DLNA playback - *put in for future use, currently uses DLNA no matter what*
         if Prefs['serverwmc_playback']=='DLNA':
                 if nowPlaying:
-                        listing = VideoClipObject(
-                                rating_key=title,
-                                key=Callback(CreateListing, url=url, chID=chID, chName=chName, programID=programID, title=title,
-                                             name=name, summary=summary, thumb=thumb, startTime=startTime, endTime=endTime,
-                                             nowPlaying=True, container=True
+                        listing = DirectoryObject(
+                                key=Callback(getProgramPage, url=url, chID=chID, chName=chName, programID=programID, title=title, name=name,
+                                             summary=summary, startTime=startTime, endTime=endTime, nowPlaying=True
                                 ),
                                 title=title,
                                 summary=summary,
-                                duration=DURATION,
-                                thumb=thumb,
-                                items=[
-                                        MediaObject(
-                                                parts = [PartObject(key=url)],
-                                                container = "mpegts",
-                                                video_resolution = 1080,
-                                                bitrate = 20000,
-                                                video_codec = "mpeg2video",
-                                                audio_codec = "AC3",
-                                                optimized_for_streaming = True
-                                                )
-                                        ]
+                                thumb=thumb
                                 )
 
                 else:
@@ -233,10 +221,7 @@ def CreateListing(url, chID, chName, programID, title, name, summary, thumb, sta
                 Log.Debug('----------CreateListing Function----------')
                 Log.Debug(title + ', ' + url + ', ' + str(thumb))
 
-        if container:
-                return ObjectContainer(objects=[listing])
-        else:
-                return listing
+        return listing
 
 ####################################################################################################
 def getListingInfo(chID, progItem, infoType='Upcoming', startDt='', endDt=''):
@@ -342,6 +327,7 @@ def GetTimers():
         if DEBUG == 'Verbose':
                 Log.Debug('----------GetTimers----------')
                 Log.Debug(resultsArray)
+
         for result in resultsArray:
                 infoArray = result.split('|')
                 timerID = infoArray[0]
@@ -413,21 +399,79 @@ def getChannelStream(channelID):
 
 ####################################################################################################
 @route(PREFIX + '/getProgramPage')
-def getProgramPage(chID, chName, programID, title, name, summary, startTime, endTime):
+def getProgramPage(chID, chName, programID, title, name, summary, startTime, endTime, url='', nowPlaying=False):
 
         oc = ObjectContainer(title2=title, no_cache=True)
 
-
-        oc.add(DirectoryObject(
-                key=Callback(recordProgram, chID=chID, chName=chName, programID=programID, name=name, startTime=startTime, endTime=endTime),
-                title=title,
-                summary=summary,
-                thumb=R(REC_ICON)
+        if nowPlaying:
+                oc.add(CreateVCO(url=url, title=title, summary=summary)
                 )
-        )
 
+                oc.add(DirectoryObject(
+                        key=Callback(recordProgram, chID=chID, chName=chName, programID=programID, name=name, startTime=startTime, endTime=endTime),
+                        title=title,
+                        summary=summary,
+                        thumb=R(REC_ICON)
+                        )
+                )
+        else:
+                oc.add(DirectoryObject(
+                        key=Callback(recordProgram, chID=chID, chName=chName, programID=programID, name=name, startTime=startTime, endTime=endTime),
+                        title=title,
+                        summary=summary,
+                        thumb=R(REC_ICON)
+                        )
+                )
 
         return oc
+
+####################################################################################################
+@route(PREFIX + '/createVCO/{title}')
+def CreateVCO(url, title, summary, container=False):
+
+        if VID_QUALITY=='1080':
+                video_resolution = 1080
+                bitrate = 20000
+        elif VID_QUALITY=='720':
+                video_resolution = 720
+                bitrate = 7000
+        elif VID_QUALITY=='480':
+                video_resolution = 480
+                bitrate = 3000
+        else:
+                video_resolution = 1080
+                bitrate = 20000
+
+        if DEBUG=='Verbose':
+                Log.Debug('ServerWMC Quality : ' + VID_QUALITY)
+                Log.Debug('Video Resolution : ' + str(video_resolution))
+                Log.Debug('Bitrate : ' + str(bitrate))
+                Log.Debug(url)
+
+        vco = VideoClipObject(
+                rating_key=url,
+                key=Callback(CreateVCO, url=url, title=title, summary=summary, container=True),
+                title=title,
+                summary=summary,
+                duration=DURATION,
+                thumb=R(PLAY_ICON),
+                items=[
+                        MediaObject(
+                                parts = [PartObject(key=url)],
+                                container = "mpegts",
+                                video_resolution = video_resolution,
+                                bitrate = bitrate,
+                                video_codec = "mpeg2video",
+                                audio_codec = "AC3",
+                                optimized_for_streaming = True
+                                )
+                        ]
+                )
+
+        if container:
+                return ObjectContainer(objects=[vco])
+        else:
+                return vco
 
 ####################################################################################################
 def recordProgram(chID, chName, programID, name, startTime, endTime):
@@ -470,9 +514,8 @@ def cancelTimer(timerID, programName, startTime):
                 timerID
         )
 
-        message = 'You have successfully cancelled the scheduled recording for {0} at {1} on {2}.'.format(
+        message = 'You have successfully cancelled the scheduled recording for {0} on {1}.'.format(
         programName,
-        getDateTime12(startTime, format='time'),
         getDateTime12(startTime, format='date')
         )
 
