@@ -64,12 +64,11 @@ def getDateTime24(time):
         return time_t
 
 ####################################################################################################
-def createStreamID(streamID):
+def createStreamID():
 
-        global STREAMID
-        newStreamID = streamID + 1
-        STREAMID = newStreamID
-        return newStreamID
+        streamID = getPlatformInt(str(Client.Platform))
+
+        return streamID
 
 ####################################################################################################
 def getTimeDif():
@@ -90,3 +89,25 @@ def getEntryID(programID):
         entryID = entryID[0]
         Log.Debug(entryID)
         return entryID
+
+####################################################################################################
+def getPlatformInt(platform):
+
+        if platform=='Chrome':
+                return 1
+        elif platform=='iOS':
+                return 2
+        elif platform=='Android':
+                return 3
+        elif platform=='Roku':
+                return 4
+        elif platform=='Windows':
+                return 5
+        elif platform=='Linux':
+                return 6
+        elif platform=='LGTV':
+                return 7
+        elif platform=='Internet Explorer':
+                return 8
+        else:
+                return 99

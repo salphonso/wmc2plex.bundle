@@ -25,7 +25,7 @@ DEL_ICON = 'del_icon.png'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, 9080)
-VERSION = '0.7.2'
+VERSION = '0.7.4'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -35,7 +35,7 @@ TZ_DIFF = timedelta(seconds=0)
 EPGDAYS = int(Prefs['serverwmc_epg_days'])
 DEBUG = Prefs['debug_level']
 VID_QUALITY = Prefs['serverwmc_quality']
-STREAMIDINT = 0
+STREAMID = 0
 DURATION = 14400000
 
 
@@ -120,6 +120,8 @@ def SubMenu(menu):
 def CreateChannel(url, chID, title, thumb):
 
         oc = ObjectContainer(title2=title, no_cache=True)
+
+        closeLiveStream()
 
         # Get Start and end datetime and convert to seconds
         startDt = u.getTimeS(datetime.datetime.utcnow())
@@ -374,11 +376,30 @@ def GetTimers():
 @route(PREFIX + '/getChannelStream')
 def getLiveStream(channelID):
 
-        platformInt = getPlatformInt(str(Client.Platform))
-
+        newStream = False
         # Build channel stream variables
-        liveStreamUrl = ''
-        streamID = u.createStreamID(STREAMID)
+        streamID = u.createStreamID()
+
+        StreamInfo = socketClient('GetPlexLiveStreamInfo', '')
+        Log.Debug(StreamInfo)
+        if len(StreamInfo) > 1 :
+                for info in StreamInfo:
+                        infoArray = info.split('|')
+                        if infoArray[0] != '':
+                                activeStreamID = int(infoArray[0])
+                        else:
+                                activeStreamID = ''
+                        if infoArray[1]==channelID and activeStreamID==streamID:
+                                liveStreamUrl = infoArray[2]
+                        elif infoArray[1]!=channelID and activeStreamID==streamID:
+                                closeLiveStream(streamID=streamID)
+                                newStream = True
+                        else:
+                                liveStreamUrl = ''
+
+                        Log.Debug(status + ' - ' + str(activeStreamID))
+        else:
+                newStream = True
 
         # Build Command string
         command = "OpenLiveStream|" + channelID + "|" + GETSTREAMINFO
@@ -387,14 +408,13 @@ def getLiveStream(channelID):
         if DEBUG == 'Normal' or DEBUG == 'Verbose':
                 Log.Debug('START STREAM -----------------------------------------------------------')
 
-        responses = socketClient(command, streamID)
-        for response in responses:
-                streamArray = response.split(',')
-                liveStreamUrl = streamArray[0]
+        if newStream:
+                responses = socketClient(command, streamID)
+                liveStreamUrl = responses[0]
 
         if DEBUG == 'Verbose':
                 Log.Debug('----------getChannelStream Function----------')
-                Log.Debug(streamID + ' - ' + liveStreamUrl)
+                Log.Debug(str(streamID) + ' - ' + liveStreamUrl)
 
         return liveStreamUrl
 
@@ -408,8 +428,7 @@ def getProgramPage(chID, chName, programID, title, name, summary, startTime, end
         Log.Debug(str(endTime) + ' - ' + str(startTime) + ' = ' + str(programDuration))
 
         if itemType=='nowplaying':
-                #testurl = getLiveStream(channelID=chID)
-                #Log.Debug('############# testurl: ' + testurl)
+                url = getLiveStream(channelID=chID)
                 oc.add(CreateVCO(url=url, title='Play : ' + title, summary=summary, duration=DURATION)
                 )
 
@@ -612,7 +631,7 @@ def closeLiveStream():
 
         # Close Stream
         command = "CloseLiveStream"
-        channelStream = socketClient(command, '')
+        channelStream = socketClient(command, u.createStreamID())
         
 ####################################################################################################
 @route(PREFIX + '/GetInfo')
@@ -627,6 +646,7 @@ def GetInfo():
         Log.Debug('ClientPlatform:'+str(Client.Protocols))
         Log.Debug('SettingsServerWMC_IP:'+str(Prefs["serverwmc_ip"]))
         Log.Debug('ServerWMC_ADDR:'+str(SERVERWMC_ADDR))
+        Log.Debug(Request.Headers)
 
 ####################################################################################################
 def socketClient(command, streamID):
@@ -681,26 +701,6 @@ def socketClient(command, streamID):
                 sock.close()
 
         return resultsArray
-
-####################################################################################################
-def getPlatformInt(platform):
-
-        if platform=='Chrome':
-                return 1
-        elif platform=='iOS':
-                return 2
-        elif platform=='Android':
-                return 3
-        elif platform=='Roku':
-                return 4
-        elif platform=='Windows':
-                return 5
-        elif platform=='Linux':
-                return 6
-        elif platform=='LGTV':
-                return 7
-        else:
-                return 9
 
 ####################################################################################################
 class pvr_time_state(enumerate):
