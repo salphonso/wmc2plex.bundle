@@ -19,13 +19,6 @@
 		"default": "1"
 	},
 	{
-		"id": "serverwmc_playback",
-		"type": "enum",
-		"label": "Playback preference",
-		"values": ["File","DLNA"],
-		"default": "DLNA"
-	},
-	{
 		"id": "serverwmc_quality",
 		"type": "enum",
 		"label": "Playback quality",
