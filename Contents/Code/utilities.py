@@ -64,9 +64,16 @@ def getDateTime24(time):
         return time_t
 
 ####################################################################################################
-def createStreamID():
+def createStreamID(streamType):
 
-        streamID = getPlatformInt(str(Client.Platform))
+        if streamType=='liveTV':
+                streamID = '1'
+        elif streamType=='recording':
+                streamID = '2'
+        else :
+                streamID = '9'
+
+        streamID = streamID + str(getPlatformInt(str(Client.Platform)))
 
         return streamID
 
@@ -109,5 +116,7 @@ def getPlatformInt(platform):
                 return 7
         elif platform=='Internet Explorer':
                 return 8
+        elif platform=='Plex Home Theater':
+                return 9
         else:
                 return 99

@@ -121,7 +121,7 @@ def CreateChannel(url, chID, title, thumb):
 
         oc = ObjectContainer(title2=title, no_cache=True)
 
-        closeLiveStream()
+        #closeLiveStream()
 
         # Get Start and end datetime and convert to seconds
         startDt = u.getTimeS(datetime.datetime.utcnow())
@@ -373,12 +373,12 @@ def GetTimers():
         return oc
 
 ####################################################################################################
-@route(PREFIX + '/getChannelStream')
+@route(PREFIX + '/getLiveStream')
 def getLiveStream(channelID):
 
         newStream = False
-        # Build channel stream variables
-        streamID = u.createStreamID()
+        # Build channel stream variables *leading 1 denotes liveTV*
+        streamID = u.createStreamID(streamType='liveTV')
 
         StreamInfo = socketClient('GetPlexLiveStreamInfo', '')
         Log.Debug(StreamInfo)
@@ -386,13 +386,13 @@ def getLiveStream(channelID):
                 for info in StreamInfo:
                         infoArray = info.split('|')
                         if infoArray[0] != '':
-                                activeStreamID = int(infoArray[0])
+                                activeStreamID = infoArray[0]
                         else:
                                 activeStreamID = ''
                         if infoArray[1]==channelID and activeStreamID==streamID:
                                 liveStreamUrl = infoArray[2]
                         elif infoArray[1]!=channelID and activeStreamID==streamID:
-                                closeLiveStream(streamID=streamID)
+                                closeLiveStream()
                                 newStream = True
                         else:
                                 liveStreamUrl = ''
@@ -413,10 +413,56 @@ def getLiveStream(channelID):
                 liveStreamUrl = responses[0]
 
         if DEBUG == 'Verbose':
-                Log.Debug('----------getChannelStream Function----------')
-                Log.Debug(str(streamID) + ' - ' + liveStreamUrl)
+                Log.Debug('----------getLiveStream Function----------')
+                Log.Debug(streamID + ' - ' + liveStreamUrl)
 
         return liveStreamUrl
+
+####################################################################################################
+@route(PREFIX + '/getRecordingStream')
+def getRecordingStream(recordingID):
+
+        newStream = False
+        # Build channel stream variables *leading 2 denotes Recording*
+        streamID = u.createStreamID(streamType='recording')
+
+        StreamInfo = socketClient('GetPlexLiveStreamInfo', '')
+        Log.Debug(StreamInfo)
+        if len(StreamInfo) > 1 :
+                for info in StreamInfo:
+                        infoArray = info.split('|')
+                        if infoArray[0] != '':
+                                activeStreamID = infoArray[0]
+                        else:
+                                activeStreamID = ''
+                        if infoArray[1]==recordingID and activeStreamID==streamID:
+                                recordingStreamUrl = infoArray[2]
+                        elif infoArray[1]!=recordingID and activeStreamID==streamID:
+                                closeLiveStream()
+                                newStream = True
+                        else:
+                                recordingStreamUrl = ''
+
+                        Log.Debug(status + ' - ' + str(activeStreamID))
+        else:
+                newStream = True
+
+        # Build Command string
+        command = "OpenRecordingStream|" + recordingID + "|" + GETSTREAMINFO
+
+        # connect and retrieve channel stream path
+        if DEBUG == 'Normal' or DEBUG == 'Verbose':
+                Log.Debug('START STREAM -----------------------------------------------------------')
+
+        if newStream:
+                responses = socketClient(command, streamID)
+                recordingStreamUrl = responses[0]
+
+        if DEBUG == 'Verbose':
+                Log.Debug('----------getRecordingStream Function----------')
+                Log.Debug(streamID + ' - ' + recordingStreamUrl)
+
+        return recordingStreamUrl
 
 ####################################################################################################
 @route(PREFIX + '/getProgramPage')
@@ -428,7 +474,7 @@ def getProgramPage(chID, chName, programID, title, name, summary, startTime, end
         Log.Debug(str(endTime) + ' - ' + str(startTime) + ' = ' + str(programDuration))
 
         if itemType=='nowplaying':
-                url = getLiveStream(channelID=chID)
+                #url = getLiveStream(channelID=chID)
                 oc.add(CreateVCO(url=url, title='Play : ' + title, summary=summary, duration=DURATION)
                 )
 
@@ -440,6 +486,7 @@ def getProgramPage(chID, chName, programID, title, name, summary, startTime, end
                         )
                 )
         elif itemType=='recordings':
+                #url = getRecordingStream(recordingID=programID)
                 oc.add(CreateVCO(url=url, title='Play : '  + title, summary=summary, duration=programDuration)
                 )
 
@@ -631,8 +678,8 @@ def closeLiveStream():
 
         # Close Stream
         command = "CloseLiveStream"
-        channelStream = socketClient(command, u.createStreamID())
-        
+        socketClient(command, u.createStreamID(streamType='liveTV'))
+
 ####################################################################################################
 @route(PREFIX + '/GetInfo')
 def GetInfo():
