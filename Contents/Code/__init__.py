@@ -138,59 +138,75 @@ def CreateChannel(url, chID, title, thumb):
                 Log.Debug(resultsArray)
 
         # Loop through resultsArray to build Channel objects
-        for result in resultsArray:
-                infoArray = result.split('|')
-                programID = infoArray[0] + '-' + infoArray[16]
-                programName = infoArray[1]
-                programStartDt24 = u.getDateTime24(infoArray[3])
-                programEndDt24 = u.getDateTime24(infoArray[4])
-                programStartDt12 = u.getDateTime12(infoArray[3], format='datetime')
-                programEndDt12 = u.getDateTime12(infoArray[4], format='time')
-                programAirTime = '(' + programStartDt12 + ' - ' + programEndDt12 + ') '
-                programOverview = infoArray[5]
-                if infoArray[14]=='None':
-                        programImage = R(thumb)
-                else:
-                        programImage = infoArray[14]
-                programEpisodeTitle = infoArray[15]
-                try:
-                        programRating = u.getRating(infoArray[8])
-                except:
-                        programRating = 'NR'
-                programTitle = programAirTime + programName
+        if len(resultsArray) > 1:
+                for result in resultsArray:
+                        infoArray = result.split('|')
+                        programID = infoArray[0] + '-' + infoArray[16]
+                        programName = infoArray[1]
+                        programStartDt24 = u.getDateTime24(infoArray[3])
+                        programEndDt24 = u.getDateTime24(infoArray[4])
+                        programStartDt12 = u.getDateTime12(infoArray[3], format='datetime')
+                        programEndDt12 = u.getDateTime12(infoArray[4], format='time')
+                        programAirTime = '(' + programStartDt12 + ' - ' + programEndDt12 + ') '
+                        programOverview = infoArray[5]
+                        if infoArray[14]=='None':
+                                programImage = R(thumb)
+                        else:
+                                programImage = infoArray[14]
+                        programEpisodeTitle = infoArray[15]
+                        try:
+                                programRating = u.getRating(infoArray[8])
+                        except:
+                                programRating = 'NR'
+                        programTitle = programAirTime + programName
 
-                if DEBUG=='Verbose':
-                        Log.Debug(programID + ',' + programTitle + ',' + programStartDt24 + ',' + programEndDt24 +
-                                ',' + programOverview + ',' + programRating)
-                if programStartDt24 <= u.getDateTime24(startDt) <= programEndDt24:
-                        oc.add(
-                                CreateListing(
-                                        url=url,
-                                        chID=chID,
-                                        chName=title,
-                                        programID=programID,
-                                        title=programTitle,
-                                        name=programName,
-                                        summary=programOverview,
-                                        startTime = infoArray[3],
-                                        endTime = infoArray[4],
-                                        thumb=programImage,
-                                        nowPlaying=True
-                                        ))
-                else:
-                        oc.add(
-                                CreateListing(
-                                        url=url,
-                                        chID=chID,
-                                        chName=title,
-                                        programID=programID,
-                                        title=programTitle,
-                                        name=programName,
-                                        summary=programOverview,
-                                        startTime = infoArray[3],
-                                        endTime = infoArray[4],
-                                        thumb=programImage
-                                        ))
+                        if DEBUG=='Verbose':
+                                Log.Debug(programID + ',' + programTitle + ',' + programStartDt24 + ',' + programEndDt24 +
+                                        ',' + programOverview + ',' + programRating)
+                        if programStartDt24 <= u.getDateTime24(startDt) <= programEndDt24:
+                                oc.add(
+                                        CreateListing(
+                                                url=url,
+                                                chID=chID,
+                                                chName=title,
+                                                programID=programID,
+                                                title=programTitle,
+                                                name=programName,
+                                                summary=programOverview,
+                                                startTime = infoArray[3],
+                                                endTime = infoArray[4],
+                                                thumb=programImage,
+                                                nowPlaying=True
+                                                ))
+                        else:
+                                oc.add(
+                                        CreateListing(
+                                                url=url,
+                                                chID=chID,
+                                                chName=title,
+                                                programID=programID,
+                                                title=programTitle,
+                                                name=programName,
+                                                summary=programOverview,
+                                                startTime = infoArray[3],
+                                                endTime = infoArray[4],
+                                                thumb=programImage
+                                                ))
+        else:
+                oc.add(
+                        CreateListing(
+                                url=url,
+                                chID=chID,
+                                chName=title,
+                                programID='99',
+                                title='No EPG Info Available',
+                                name='No EPG Info Available',
+                                summary='No EPG Info Available.  Check WMC for more info.',
+                                startTime = 1423072800,
+                                endTime = 1423072800 + DURATION,
+                                thumb=R(PLAY_ICON),
+                                nowPlaying=True
+                                ))
 
         return oc
 
@@ -243,76 +259,80 @@ def getListingInfo(chID, progItem, infoType='Upcoming', startDt='', endDt=''):
                 Log.Debug(resultsArray)
 
         # Loop through results array and build Channel info objects
-        count = 0
-        for result in resultsArray:
-                count += 1
-                infoArray = result.split('|')
-                # only get now playing item
-                if count in (1,2) and infoType in ('nowPlaying', 'upNext'):
-                        programID = infoArray[0] + '-' + infoArray[16]
-                        programName = infoArray[1]
-                        programStartDt = u.getDateTime12(infoArray[3], format='datetime')
-                        programEndDt = u.getDateTime12(infoArray[4], format='time')
-                        programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
-                        programOverview = infoArray[5]
-                        programImage = infoArray[14]
-                        programEpisodeTitle = infoArray[15]
-                        try:
-                                programRating = getRating(infoArray[8])
-                        except:
-                                programRating = 'NR'
-                        programName = programAirTime + programName
+        if len(resultsArray) > 1:
+                count = 0
+                for result in resultsArray:
+                        count += 1
+                        infoArray = result.split('|')
+                        # only get now playing item
+                        if count in (1,2) and infoType in ('nowPlaying', 'upNext'):
+                                programID = infoArray[0] + '-' + infoArray[16]
+                                programName = infoArray[1]
+                                programStartDt = u.getDateTime12(infoArray[3], format='datetime')
+                                programEndDt = u.getDateTime12(infoArray[4], format='time')
+                                programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
+                                programOverview = infoArray[5]
+                                programImage = infoArray[14]
+                                programEpisodeTitle = infoArray[15]
+                                try:
+                                        programRating = getRating(infoArray[8])
+                                except:
+                                        programRating = 'NR'
+                                programName = programAirTime + programName
 
-                        if DEBUG == 'Verbose':
-                                Log.Debug(programID + ',' + programName + ',' + programStartDt + ',' + programEndDt +
-                                         ',' + programOverview + ',' + programRating)
+                                if DEBUG == 'Verbose':
+                                        Log.Debug(programID + ',' + programName + ',' + programStartDt + ',' + programEndDt +
+                                                 ',' + programOverview + ',' + programRating)
 
-                        if progItem == 'programID' : progData=programID,
-                        elif progItem == 'programName' : progData=programName,
-                        elif progItem == 'programStartDt' : progData=programStartDt,
-                        elif progItem == 'programEndDt' : progData=programEndDt,
-                        elif progItem == 'programOverview' : progData=programOverview,
-                        elif progItem == 'programImage' : progData=programImage,
-                        elif progItem == 'programEpisodeTitle' : progData=programEpisodeTitle
-                        else : progItem = ''
-                        break
-                elif infoType == 'singleItem':
-                        programID = infoArray[0] + '-' + infoArray[16]
-                        programName = infoArray[1]
-                        programStartDt = u.getDateTime12(infoArray[3], format='datetime')
-                        programEndDt = u.getDateTime12(infoArray[4], format='time')
-                        programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
-                        programOverview = infoArray[5]
-                        programImage = infoArray[14]
-                        programEpisodeTitle = infoArray[15]
-                        try:
-                                programRating = u.getRating(infoArray[8])
-                        except:
-                                programRating = 'NR'
-                        programName = programAirTime + programName
+                                if progItem == 'programID' : progData=programID,
+                                elif progItem == 'programName' : progData=programName,
+                                elif progItem == 'programStartDt' : progData=programStartDt,
+                                elif progItem == 'programEndDt' : progData=programEndDt,
+                                elif progItem == 'programOverview' : progData=programOverview,
+                                elif progItem == 'programImage' : progData=programImage,
+                                elif progItem == 'programEpisodeTitle' : progData=programEpisodeTitle
+                                else : progItem = ''
+                                break
+                        elif infoType == 'singleItem':
+                                programID = infoArray[0] + '-' + infoArray[16]
+                                programName = infoArray[1]
+                                programStartDt = u.getDateTime12(infoArray[3], format='datetime')
+                                programEndDt = u.getDateTime12(infoArray[4], format='time')
+                                programAirTime = '(' + programStartDt + ' - ' + programEndDt + ') '
+                                programOverview = infoArray[5]
+                                programImage = infoArray[14]
+                                programEpisodeTitle = infoArray[15]
+                                try:
+                                        programRating = u.getRating(infoArray[8])
+                                except:
+                                        programRating = 'NR'
+                                programName = programAirTime + programName
 
-                        if DEBUG == 'Verbose':
-                                Log.Debug(programID + ',' + programName + ',' + programStartDt + ',' + programEndDt +
-                                         ',' + programOverview + ',' + programRating)
+                                if DEBUG == 'Verbose':
+                                        Log.Debug(programID + ',' + programName + ',' + programStartDt + ',' + programEndDt +
+                                                 ',' + programOverview + ',' + programRating)
 
-                        if progItem == 'programID' : progData=programID,
-                        elif progItem == 'programName' : progData=programName,
-                        elif progItem == 'programStartDt' : progData=programStartDt,
-                        elif progItem == 'programEndDt' : progData=programEndDt,
-                        elif progItem == 'programOverview' : progData=programOverview,
-                        elif progItem == 'programImage' : progData=programImage,
-                        elif progItem == 'programEpisodeTitle' : progData=programEpisodeTitle
-                        else : progItem = ''
-                        break
-                elif count>2:
-                        break
-                else:
-                        pass
+                                if progItem == 'programID' : progData=programID,
+                                elif progItem == 'programName' : progData=programName,
+                                elif progItem == 'programStartDt' : progData=programStartDt,
+                                elif progItem == 'programEndDt' : progData=programEndDt,
+                                elif progItem == 'programOverview' : progData=programOverview,
+                                elif progItem == 'programImage' : progData=programImage,
+                                elif progItem == 'programEpisodeTitle' : progData=programEpisodeTitle
+                                else : progItem = ''
+                                break
+                        elif count>2:
+                                break
+                        else:
+                                pass
 
-        progData = str(progData[0])
+                progData = str(progData[0])
+
+        else:
+                progData = 'No Listing Info : Update WMC Guide Data and/or check WMC logs for details.'
 
         if DEBUG == 'Normal' or DEBUG == 'Verbose':
-                        Log.Debug(progData)
+                Log.Debug(progData)
 
         return progData
 
@@ -355,9 +375,7 @@ def GetTimers():
                         u.getDateTime12(endDateTime)
                 )
 
-                programSummary = getListingInfo(
-                        chID=chID, progItem='programOverview', infoType='singleItem', startDt=startDateTime, endDt=endDateTime
-                )
+                programSummary = infoArray[7]
 
                 if DEBUG == 'Verbose':
                         Log.Debug(infoArray)
@@ -376,6 +394,7 @@ def GetTimers():
 @route(PREFIX + '/getLiveStream')
 def getLiveStream(channelID):
 
+        # Currently not used.  Open and closing of streams is being handled on swmc side.
         newStream = False
         # Build channel stream variables *leading 1 denotes liveTV*
         streamID = u.createStreamID(streamType='liveTV')
@@ -422,6 +441,7 @@ def getLiveStream(channelID):
 @route(PREFIX + '/getRecordingStream')
 def getRecordingStream(recordingID):
 
+        # Currently not used.  Open and closing of streams is being handled on swmc side.
         newStream = False
         # Build channel stream variables *leading 2 denotes Recording*
         streamID = u.createStreamID(streamType='recording')
@@ -466,12 +486,17 @@ def getRecordingStream(recordingID):
 
 ####################################################################################################
 @route(PREFIX + '/getProgramPage')
-def getProgramPage(chID, chName, programID, title, name, summary, startTime, endTime, url='', itemType=''):
+def getProgramPage(chID, chName, programID, title, name, summary, startTime, endTime, duration =0, url='', itemType=''):
 
         oc = ObjectContainer(title2=title, no_cache=True)
 
-        programDuration = (int(endTime) - int(startTime)) * 1000
-        Log.Debug(str(endTime) + ' - ' + str(startTime) + ' = ' + str(programDuration))
+        if duration==0:
+                programDuration = (int(endTime) - int(startTime)) * 1000
+        else:
+                programDuration = duration
+        if DEBUG=='Verbose':
+                Log.Debug('----------getProgramPage Function----------')
+                Log.Debug(str(endTime) + ' - ' + str(startTime) + ' = ' + str(programDuration))
 
         if itemType=='nowplaying':
                 #url = getLiveStream(channelID=chID)
@@ -580,6 +605,7 @@ def GetRecordings():
                 programImage = infoArray[7]
                 startDtTime = infoArray[9]
                 endDtTime = int(infoArray[9]) + int(infoArray[10])
+                duration = int(infoArray[11])
                 airedDate = u.getDateTime12(infoArray[21], format='date')
 
                 if DEBUG=='Verbose':
@@ -675,7 +701,7 @@ def deleteRecording(recordingID, recordingName):
 
 ####################################################################################################
 def closeLiveStream():
-
+        # Currently not used.  Open and closing of streams is being handled on swmc side.
         # Close Stream
         command = "CloseLiveStream"
         socketClient(command, u.createStreamID(streamType='liveTV'))
