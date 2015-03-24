@@ -11,6 +11,7 @@ import socket
 import datetime
 from datetime import timedelta
 import utilities as u
+import os
 
 PREFIX = '/video/wmc2plex'
 NAME = 'PlexWMC'
@@ -24,8 +25,8 @@ RECORDEDTV_ICON = 'recordedtv_icon.png'
 DEL_ICON = 'del_icon.png'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
-SERVERWMC_ADDR = (SERVERWMC_IP, 9080)
-VERSION = '0.8.0'
+SERVERWMC_ADDR = (SERVERWMC_IP, int(SERVERWMC_PORT))
+VERSION = '0.8.1'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -550,13 +551,26 @@ def CreateVCO(url, title, summary, duration, container=False):
                 video_resolution = 1080
                 bitrate = 20000
 
+        urlExtension = os.path.splitext(url)[1][1:]
+
         if DEBUG=='Verbose':
                 Log.Debug('----------createVCO Function----------')
                 Log.Debug('ServerWMC Quality : ' + VID_QUALITY)
                 Log.Debug('Video Resolution : ' + str(video_resolution))
                 Log.Debug('Bitrate : ' + str(bitrate))
                 Log.Debug('Duration : ' + str(duration))
+                Log.Debug('Extension : ' + str(urlExtension))
                 Log.Debug(url)
+
+        mo = MediaObject(
+                parts = [PartObject(key=url)],
+                container = "mpegts",
+                video_resolution = video_resolution,
+                bitrate = bitrate,
+                video_codec = "mpeg2video",
+                audio_codec = "AC3",
+                optimized_for_streaming = True
+                )
 
         vco = VideoClipObject(
                 rating_key=url,
@@ -566,15 +580,7 @@ def CreateVCO(url, title, summary, duration, container=False):
                 duration=int(duration),
                 thumb=R(PLAY_ICON),
                 items=[
-                        MediaObject(
-                                parts = [PartObject(key=url)],
-                                container = "mpegts",
-                                video_resolution = video_resolution,
-                                bitrate = bitrate,
-                                video_codec = "mpeg2video",
-                                audio_codec = "AC3",
-                                optimized_for_streaming = True
-                                )
+                        mo
                         ]
                 )
 
