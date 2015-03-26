@@ -1,3 +1,4 @@
+# -*- coding: cp1252 -*-
 ####################################################################################################
 # project: wmc2plex plugin
 # description: Plugin for Plex to allow viewing of liveTV, EPG, and the scheduling/viewing of
@@ -26,7 +27,7 @@ DEL_ICON = 'del_icon.png'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, int(SERVERWMC_PORT))
-VERSION = '0.8.1'
+VERSION = '0.8.2'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -376,7 +377,7 @@ def GetTimers():
                         u.getDateTime12(endDateTime)
                 )
 
-                programSummary = infoArray[7]
+                programSummary = unicode(infoArray[7], 'UTF-8')
 
                 if DEBUG == 'Verbose':
                         Log.Debug(infoArray)
@@ -606,7 +607,7 @@ def GetRecordings():
                 programID = infoArray[0]
                 programName = infoArray[1]
                 programURL = infoArray[2]
-                programSummary = infoArray[5]
+                programSummary = L(infoArray[5])
                 programChannel = infoArray[6]
                 programImage = infoArray[7]
                 startDtTime = infoArray[9]
@@ -770,6 +771,7 @@ def socketClient(command, streamID):
 
                 # Convert response string to array
                 resultsArray = response.split('<EOL>')
+                resultsArray.decode(encoding='UTF-8', errors='strict')
 
         except:
                 Log.Error('Trying to connect to ' + ''.join(SERVERWMC_IP) + ':'

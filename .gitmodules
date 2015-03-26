@@ -1,0 +1,3 @@
+[submodule "Contents/Code/locale_patch"]
+	path = Contents/Code/locale_patch
+	url = https://bitbucket.org/czukowski/plex-locale-patch.git
