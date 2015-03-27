@@ -771,7 +771,7 @@ def socketClient(command, streamID):
 
                 # Convert response string to array
                 resultsArray = response.split('<EOL>')
-                resultsArray.decode(encoding='UTF-8', errors='strict')
+                resultsArray = resultsArray.decode(encoding='UTF-8', errors='strict')
 
         except:
                 Log.Error('Trying to connect to ' + ''.join(SERVERWMC_IP) + ':'
