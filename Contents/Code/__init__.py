@@ -150,7 +150,7 @@ def CreateChannel(url, chID, title, thumb):
                         programStartDt12 = u.getDateTime12(infoArray[3], format='datetime')
                         programEndDt12 = u.getDateTime12(infoArray[4], format='time')
                         programAirTime = '(' + programStartDt12 + ' - ' + programEndDt12 + ') '
-                        programOverview = infoArray[5]
+                        programOverview = infoArray[5].decode(encoding='UTF-8', errors='strict')
                         if infoArray[14]=='None':
                                 programImage = R(thumb)
                         else:
@@ -607,7 +607,7 @@ def GetRecordings():
                 programID = infoArray[0]
                 programName = infoArray[1]
                 programURL = infoArray[2]
-                programSummary = L(infoArray[5])
+                programSummary = infoArray[5].decode(encoding='UTF-8', errors='strict')
                 programChannel = infoArray[6]
                 programImage = infoArray[7]
                 startDtTime = infoArray[9]
