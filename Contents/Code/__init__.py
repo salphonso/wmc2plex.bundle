@@ -27,7 +27,7 @@ DEL_ICON = 'del_icon.png'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, int(SERVERWMC_PORT))
-VERSION = '0.8.2'
+VERSION = '0.9.0'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -49,6 +49,7 @@ def Start():
         u.getTimeDif()
         ObjectContainer.art = R(ART)
         ObjectContainer.title1 = NAME
+        socketClient('GetServerVersion', '')
 
 ####################################################################################################
 @handler(PREFIX, NAME, ART)
@@ -58,15 +59,14 @@ def MainMenu():
 
         GetInfo()
 
-        socketClient('GetServerVersion', '')
-
         oc = ObjectContainer(title1=NAME,no_cache=True)
 
         # Settings
         oc.add(PrefsObject(title='Settings', thumb=R('icon-settings.png')))
 
         # Channels
-        oc.add(DirectoryObject(key = Callback(SubMenu, menu='Channels'), title='Channels', thumb=R(CHANNEL_ICON)))
+        oc.add(DirectoryObject(key = Callback(SubMenu, menu='LiveTV'), title='LiveTV', thumb=R(CHANNEL_ICON)))
+        oc.add(DirectoryObject(key = Callback(SubMenu, menu='Guide'), title='Guide', thumb=R(CHANNEL_ICON)))
         oc.add(DirectoryObject(key = Callback(GetTimers), title='Scheduled Recordings', thumb=R(TIMER_ICON)))
         oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recorded TV', thumb=R(RECORDEDTV_ICON)))
 
@@ -82,7 +82,7 @@ def SubMenu(menu):
         resultsArray = socketClient('GetChannels', '')
 
         if DEBUG == 'Verbose':
-                Log.Debug('----------SubMenu Function----------')
+                Log.Debug('----------SubMenu Function : ' + menu + '----------')
                 Log.Debug(resultsArray)
 
         # Loop through resultsArray to build Channel objects
@@ -101,19 +101,31 @@ def SubMenu(menu):
                 channelTitle = channelName + '(' + channelNumber + ')'
                 channelURL = channelArray[9]
                 Thumb = channelImageFile
-                summaryData = getListingInfo(chID=channelID, progItem='programName', infoType='nowPlaying')
-                summaryData = summaryData + ' : ' + getListingInfo(chID=channelID, progItem='programOverview', infoType='nowPlaying')
-                Summary='Now Playing : ' + summaryData
+                if menu == 'Guide':
+                        summaryData = getListingInfo(chID=channelID, progItem='programName', infoType='nowPlaying')
+                        summaryData = summaryData + ' : ' + getListingInfo(chID=channelID, progItem='programOverview', infoType='nowPlaying')
+                        Summary='Now Playing : ' + summaryData
+                else:
+                        Summary = ''
 
                 if DEBUG=='Normal' or DEBUG=='Verbose':
                         Log.Debug(channelImageFile + ' - ' + channelArray[5])
                         Log.Debug(channelTitle + ', ' + channelURL + ', ' + channelImageFile + ', '
                                   + channelNumber + ', ' + channelName)
 
-                if menu=='Channels':
+                if menu=='Guide':
                         oc.add(DirectoryObject(key=Callback(
                                 CreateChannel, url=channelURL, chID=channelID, title=channelTitle, thumb=Thumb),
                                 title=channelTitle, summary=Summary, thumb=Thumb))
+
+                if menu=='LiveTV':
+                        oc.add(CreateVCO(
+                                url=channelURL,
+                                title=channelTitle,
+                                summary=Summary,
+                                duration=DURATION,
+                                icon=Thumb)
+                               )
 
         return oc
 
@@ -537,7 +549,7 @@ def getProgramPage(chID, chName, programID, title, name, summary, startTime, end
 
 ####################################################################################################
 @route(PREFIX + '/createVCO/{title}')
-def CreateVCO(url, title, summary, duration, container=False):
+def CreateVCO(url, title, summary, duration, icon='', container=False):
 
         if VID_QUALITY=='1080':
                 video_resolution = 1080
@@ -573,13 +585,17 @@ def CreateVCO(url, title, summary, duration, container=False):
                 optimized_for_streaming = True
                 )
 
+
+        if icon=='':
+                icon=R(PLAY_ICON)
+                
         vco = VideoClipObject(
                 rating_key=url,
                 key=Callback(CreateVCO, url=url, title=title, summary=summary, duration=duration, container=True),
                 title=title,
                 summary=summary,
                 duration=int(duration),
-                thumb=R(PLAY_ICON),
+                thumb=icon,
                 items=[
                         mo
                         ]
