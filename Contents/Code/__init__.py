@@ -27,7 +27,7 @@ DEL_ICON = 'del_icon.png'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, int(SERVERWMC_PORT))
-VERSION = '0.9.0'
+VERSION = '0.10.0'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -40,15 +40,16 @@ VID_QUALITY = Prefs['serverwmc_quality']
 STREAMID = 0
 DURATION = 14400000
 
-
-
 ####################################################################################################
 def Start():
 
         # Get time zone hour difference in seconds
+        Plugin.AddViewGroup("Details", viewMode="InfoList", mediaType="items")
+        Plugin.AddViewGroup("List", viewMode="List", mediaType="items")
         u.getTimeDif()
         ObjectContainer.art = R(ART)
         ObjectContainer.title1 = NAME
+        ObjectContainer.view_group = 'Details'
         socketClient('GetServerVersion', '')
 
 ####################################################################################################
@@ -65,28 +66,36 @@ def MainMenu():
         oc.add(PrefsObject(title='Settings', thumb=R('icon-settings.png')))
 
         # Channels
-        oc.add(DirectoryObject(key = Callback(SubMenu, menu='LiveTV'), title='LiveTV', thumb=R(CHANNEL_ICON)))
-        oc.add(DirectoryObject(key = Callback(SubMenu, menu='Guide'), title='Guide', thumb=R(CHANNEL_ICON)))
+        oc.add(DirectoryObject(key = Callback(SubMenu, title='Channels'), title='Channels', thumb=R(CHANNEL_ICON)))
+        oc.add(DirectoryObject(key = Callback(SubMenu, title='Guide'), title='Guide', thumb=R(CHANNEL_ICON)))
         oc.add(DirectoryObject(key = Callback(GetTimers), title='Scheduled Recordings', thumb=R(TIMER_ICON)))
         oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recorded TV', thumb=R(RECORDEDTV_ICON)))
 
         return oc
 
 ####################################################################################################
-@route(PREFIX +'/SubMenu/{menu}')
-def SubMenu(menu):
+@route(PREFIX +'/SubMenu/{title}', offset=int)
+def SubMenu(title, offset = 0):
 
-        oc = ObjectContainer(title2=menu, no_cache=True)
+        oc = ObjectContainer(title2=title, no_cache=True)
+
+        counter = 0
+        itemsPerPage = int(Prefs['ItemsPerPage'])
 
         # Connect and Get Channel List
         resultsArray = socketClient('GetChannels', '')
 
         if DEBUG == 'Verbose':
-                Log.Debug('----------SubMenu Function : ' + menu + '----------')
+                Log.Debug('----------SubMenu Function : ' + title + '----------')
                 Log.Debug(resultsArray)
 
         # Loop through resultsArray to build Channel objects
         for result in resultsArray:
+                counter = counter + 1
+
+                if counter <= offset:
+                        continue
+                
                 channelArray = result.split('|')
                 channelID = channelArray[0]
                 try:
@@ -101,7 +110,7 @@ def SubMenu(menu):
                 channelTitle = channelName + '(' + channelNumber + ')'
                 channelURL = channelArray[9]
                 Thumb = channelImageFile
-                if menu == 'Guide':
+                if title == 'Guide':
                         summaryData = getListingInfo(chID=channelID, progItem='programName', infoType='nowPlaying')
                         summaryData = summaryData + ' : ' + getListingInfo(chID=channelID, progItem='programOverview', infoType='nowPlaying')
                         Summary='Now Playing : ' + summaryData
@@ -113,12 +122,12 @@ def SubMenu(menu):
                         Log.Debug(channelTitle + ', ' + channelURL + ', ' + channelImageFile + ', '
                                   + channelNumber + ', ' + channelName)
 
-                if menu=='Guide':
+                if title=='Guide':                      
                         oc.add(DirectoryObject(key=Callback(
                                 CreateChannel, url=channelURL, chID=channelID, title=channelTitle, thumb=Thumb),
                                 title=channelTitle, summary=Summary, thumb=Thumb))
 
-                if menu=='LiveTV':
+                if title=='Channels':
                         oc.add(CreateVCO(
                                 url=channelURL,
                                 title=channelTitle,
@@ -126,6 +135,11 @@ def SubMenu(menu):
                                 duration=DURATION,
                                 icon=Thumb)
                                )
+                        
+                if len(oc) >= itemsPerPage:
+                        oc.add(NextPageObject(key = Callback(SubMenu, title = title, offset = counter), title = "Next..."))
+                                
+                        return oc
 
         return oc
 
@@ -139,7 +153,7 @@ def CreateChannel(url, chID, title, thumb):
 
         # Get Start and end datetime and convert to seconds
         startDt = u.getTimeS(datetime.datetime.utcnow())
-        endDt = int(startDt + (timedelta(days=EPGDAYS)).total_seconds())
+        endDt = int(startDt + (timedelta(days=int(Prefs['serverwmc_epg_days']))).total_seconds())
 
         # build request string
         sendCommand = 'GetEntries|{0}|{1}|{2}'.format(chID, startDt, endDt)
@@ -260,7 +274,7 @@ def getListingInfo(chID, progItem, infoType='Upcoming', startDt='', endDt=''):
         # Get Start and end datetime and convert to seconds
         if infoType != 'singleItem':
                 startDt = u.getTimeS(datetime.datetime.utcnow())
-                endDt = int(startDt + (timedelta(days=EPGDAYS)).total_seconds())
+                endDt = int(startDt + (timedelta(days=int(Prefs['serverwmc_epg_days']))).total_seconds())
 
         # build request string
         sendCommand = 'GetEntries|{0}|{1}|{2}'.format(chID, startDt, endDt)
@@ -821,3 +835,4 @@ class recordingState_wmc(enumerate):
         recording = 3
         recorded = 4
         deleted = 5
+        

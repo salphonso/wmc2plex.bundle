@@ -19,6 +19,12 @@
 		"default": "1"
 	},
 	{
+		"id": "ItemsPerPage",
+		"type": "text",
+		"label": "Items Per Page",
+		"default": "25"
+	},
+	{
 		"id": "serverwmc_quality",
 		"type": "enum",
 		"label": "Playback quality",
