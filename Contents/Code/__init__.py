@@ -27,7 +27,7 @@ DEL_ICON = 'del_icon.png'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, int(SERVERWMC_PORT))
-VERSION = '0.10.0'
+VERSION = '0.11.0'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -70,6 +70,7 @@ def MainMenu():
         oc.add(DirectoryObject(key = Callback(SubMenu, title='Guide'), title='Guide', thumb=R(CHANNEL_ICON)))
         oc.add(DirectoryObject(key = Callback(GetTimers), title='Scheduled Recordings', thumb=R(TIMER_ICON)))
         oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recorded TV', thumb=R(RECORDEDTV_ICON)))
+        oc.add(DirectoryObject(key = Callback(GetSeries), title='Manage Series', thumb=R(RECORDEDTV_ICON)))
 
         return oc
 
@@ -419,6 +420,41 @@ def GetTimers():
         return oc
 
 ####################################################################################################
+@route(PREFIX + '/GetSeries')
+def GetSeries():
+
+        oc = ObjectContainer(title2='Scheduled Series Recordings', no_cache=True)
+
+        # Connect and Get list of recordings
+        resultsArray = socketClient('GetSeriesTimers', '')
+
+        if DEBUG == 'Verbose':
+                Log.Debug('----------GetSeries----------')
+                Log.Debug(resultsArray)
+
+        for result in resultsArray:
+                infoArray = result.split('|')
+                seriesID = infoArray[0]
+                name = infoArray[1]
+                chID = infoArray[2]
+##                programImage = getListingInfo(
+##                        chID=chID, progItem='programImage', infoType='singleItem', startDt=startDateTime, endDt=endDateTime
+##                )
+
+                if DEBUG == 'Verbose':
+                        Log.Debug(infoArray)
+
+                oc.add(DirectoryObject(
+                        key=Callback(cancelSeriesTimer, seriesID=seriesID, programName=name),
+                        title=name,
+                        summary=name,
+                        thumb=DEL_ICON
+                        )
+                )
+
+        return oc
+
+####################################################################################################
 @route(PREFIX + '/getLiveStream')
 def getLiveStream(channelID):
 
@@ -716,6 +752,25 @@ def cancelTimer(timerID, programName, startTime):
                 Log.Debug(responses)
                 Log.Debug(message)
         return ObjectContainer(header='Cancelled', message=message)
+
+####################################################################################################
+def cancelSeriesTimer(seriesID, programName):
+
+        command = 'CancelSeriesTimer|{0}'.format(
+                seriesID
+        )
+
+        message = 'You have successfully cancelled the scheduled series for {0}.'.format(
+        programName)
+        
+
+        responses = socketClient(command, '')
+        if DEBUG == 'Verbose':
+                Log.Debug('----------cancelSeriesTimer----------')
+                Log.Debug('Send Command:' + command)
+                Log.Debug(responses)
+                Log.Debug(message)
+        return ObjectContainer(header='Series Cancelled', message=message)
 
 ####################################################################################################
 def deleteRecording(recordingID, recordingName):
