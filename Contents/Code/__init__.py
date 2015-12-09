@@ -27,7 +27,7 @@ DEL_ICON = 'del_icon.png'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, int(SERVERWMC_PORT))
-VERSION = '0.11.0'
+VERSION = '0.11.1'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -129,6 +129,10 @@ def SubMenu(title, offset = 0):
                                 title=channelTitle, summary=Summary, thumb=Thumb))
 
                 if title=='Channels':
+                        if Prefs['nowPlaying_channels']==True:
+                                summaryData = getListingInfo(chID=channelID, progItem='programName', infoType='nowPlaying')
+                                channelTitle = channelTitle + ' - Now Playing: ' + summaryData
+                                
                         oc.add(CreateVCO(
                                 url=channelURL,
                                 title=channelTitle,

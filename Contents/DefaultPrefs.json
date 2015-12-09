@@ -1,5 +1,17 @@
 [
 	{
+		"id": "nowPlaying_channels",
+		"type": "bool",
+		"label": "Show Now Playing in Title",
+		"default": "False"
+	},
+	{
+		"id": "ItemsPerPage",
+		"type": "text",
+		"label": "Items Per Page",
+		"default": "25"
+	},
+	{
 		"id": "serverwmc_ip",
 		"type": "text",
 		"label": "ServerWMC IP",
@@ -17,12 +29,6 @@
 		"label": "Days of EPG Data",
 		"values": ["1","2","3","4","5","6","7"],
 		"default": "1"
-	},
-	{
-		"id": "ItemsPerPage",
-		"type": "text",
-		"label": "Items Per Page",
-		"default": "25"
 	},
 	{
 		"id": "serverwmc_quality",
