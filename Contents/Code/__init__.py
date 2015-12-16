@@ -27,7 +27,7 @@ DEL_ICON = 'del_icon.png'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, int(SERVERWMC_PORT))
-VERSION = '0.11.1'
+VERSION = '0.11.2'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -44,18 +44,16 @@ DURATION = 14400000
 def Start():
 
         # Get time zone hour difference in seconds
-        Plugin.AddViewGroup("Details", viewMode="InfoList", mediaType="items")
-        Plugin.AddViewGroup("List", viewMode="List", mediaType="items")
         u.getTimeDif()
         ObjectContainer.art = R(ART)
         ObjectContainer.title1 = NAME
-        ObjectContainer.view_group = 'Details'
         socketClient('GetServerVersion', '')
 
 ####################################################################################################
 @handler(PREFIX, NAME, ART)
 def MainMenu():
 
+        DEBUG = Prefs['debug_level']
         Log.Debug(Core.bundle_path)
 
         GetInfo()
@@ -68,8 +66,8 @@ def MainMenu():
         # Channels
         oc.add(DirectoryObject(key = Callback(SubMenu, title='Channels'), title='Channels', thumb=R(CHANNEL_ICON)))
         oc.add(DirectoryObject(key = Callback(SubMenu, title='Guide'), title='Guide', thumb=R(CHANNEL_ICON)))
-        oc.add(DirectoryObject(key = Callback(GetTimers), title='Scheduled Recordings', thumb=R(TIMER_ICON)))
         oc.add(DirectoryObject(key = Callback(GetRecordings), title='Recorded TV', thumb=R(RECORDEDTV_ICON)))
+        oc.add(DirectoryObject(key = Callback(GetTimers), title='Scheduled Recordings', thumb=R(TIMER_ICON)))
         oc.add(DirectoryObject(key = Callback(GetSeries), title='Manage Series', thumb=R(RECORDEDTV_ICON)))
 
         return oc
@@ -78,6 +76,7 @@ def MainMenu():
 @route(PREFIX +'/SubMenu/{title}', offset=int)
 def SubMenu(title, offset = 0):
 
+        DEBUG = Prefs['debug_level']
         oc = ObjectContainer(title2=title, no_cache=True)
 
         counter = 0
@@ -168,7 +167,8 @@ def CreateChannel(url, chID, title, thumb):
 
         if DEBUG=='Verbose':
                 Log.Debug('----------CreateChannel Function----------')
-                Log.Debug(resultsArray)
+                Log.Debug('Full resultsArray : ' + str(resultsArray))
+                Log.Debug('--------Array list Itemized--------')
 
         # Loop through resultsArray to build Channel objects
         if len(resultsArray) > 1:
@@ -194,6 +194,7 @@ def CreateChannel(url, chID, title, thumb):
                         programTitle = programAirTime + programName
 
                         if DEBUG=='Verbose':
+                                Log.Debug('infoArray : ' + str(infoArray))
                                 Log.Debug(programID + ',' + programTitle + ',' + programStartDt24 + ',' + programEndDt24 +
                                         ',' + programOverview + ',' + programRating)
                         if programStartDt24 <= u.getDateTime24(startDt) <= programEndDt24:
@@ -602,7 +603,7 @@ def getProgramPage(chID, chName, programID, title, name, summary, startTime, end
         return oc
 
 ####################################################################################################
-@route(PREFIX + '/createVCO/{title}')
+@route(PREFIX + '/createVCO')
 def CreateVCO(url, title, summary, duration, icon='', container=False):
 
         if VID_QUALITY=='1080':
@@ -618,6 +619,8 @@ def CreateVCO(url, title, summary, duration, icon='', container=False):
                 video_resolution = 1080
                 bitrate = 20000
 
+        url = url.replace('%3A', ':')
+        url = url.replace('%2F', '/')
         urlExtension = os.path.splitext(url)[1][1:]
 
         if DEBUG=='Verbose':
@@ -627,7 +630,8 @@ def CreateVCO(url, title, summary, duration, icon='', container=False):
                 Log.Debug('Bitrate : ' + str(bitrate))
                 Log.Debug('Duration : ' + str(duration))
                 Log.Debug('Extension : ' + str(urlExtension))
-                Log.Debug(url)
+                Log.Debug('Program Title : ' + title)
+                Log.Debug('URL : ' + url)
 
         mo = MediaObject(
                 parts = [PartObject(key=url)],
@@ -812,7 +816,7 @@ def GetInfo():
         Log.Debug('PlatformCPU:'+Platform.CPU)
         Log.Debug('PlatformHasSilverlight:'+str(Platform.HasSilverlight))
         Log.Debug('ClientPlatform:'+str(Client.Platform))
-        Log.Debug('ClientPlatform:'+str(Client.Protocols))
+        Log.Debug('ClientProtocols:'+str(Client.Protocols))
         Log.Debug('SettingsServerWMC_IP:'+str(Prefs["serverwmc_ip"]))
         Log.Debug('ServerWMC_ADDR:'+str(SERVERWMC_ADDR))
         Log.Debug(Request.Headers)
