@@ -27,7 +27,7 @@ DEL_ICON = 'del_icon.png'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, int(SERVERWMC_PORT))
-VERSION = '0.11.2'
+VERSION = '0.11.3'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -640,6 +640,7 @@ def CreateVCO(url, title, summary, duration, icon='', container=False):
                 bitrate = bitrate,
                 video_codec = "mpeg2video",
                 audio_codec = "AC3",
+                audio_channels = 6,
                 optimized_for_streaming = True
                 )
 
