@@ -27,7 +27,7 @@ DEL_ICON = 'del_icon.png'
 SERVERWMC_IP = Prefs['serverwmc_ip']
 SERVERWMC_PORT = Prefs['serverwmc_port']
 SERVERWMC_ADDR = (SERVERWMC_IP, int(SERVERWMC_PORT))
-VERSION = '0.11.3'
+VERSION = '0.11.4'
 MACHINENAME = socket.gethostname()
 IDSTREAMINT = 0
 GETSTREAMINFO = 'IncludeStreamInfo'
@@ -604,7 +604,7 @@ def getProgramPage(chID, chName, programID, title, name, summary, startTime, end
 
 ####################################################################################################
 @route(PREFIX + '/createVCO')
-def CreateVCO(url, title, summary, duration, icon='', container=False):
+def CreateVCO(url, title, summary, duration, icon='', container=False, checkFiles=0):
 
         if VID_QUALITY=='1080':
                 video_resolution = 1080
