@@ -638,7 +638,7 @@ def CreateVCO(url, title, summary, duration, icon='', container=False, checkFile
                 container = "mpegts",
                 video_resolution = video_resolution,
                 bitrate = bitrate,
-                video_codec = "mpeg2video",
+                video_codec = "h.264",
                 audio_codec = "AC3",
                 audio_channels = 6,
                 optimized_for_streaming = True
@@ -650,7 +650,7 @@ def CreateVCO(url, title, summary, duration, icon='', container=False, checkFile
                 
         vco = VideoClipObject(
                 rating_key=url,
-                key=Callback(CreateVCO, url=url, title=title, summary=summary, duration=duration, container=True),
+                key=Callback(CreateVCO, url=url, title=title, summary=summary, duration=duration, container=True, checkFiles = 0),
                 title=title,
                 summary=summary,
                 duration=int(duration),
@@ -817,7 +817,7 @@ def GetInfo():
         Log.Debug('PlatformCPU:'+Platform.CPU)
         Log.Debug('PlatformHasSilverlight:'+str(Platform.HasSilverlight))
         Log.Debug('ClientPlatform:'+str(Client.Platform))
-        Log.Debug('ClientProtocols:'+str(Client.Protocols))
+        #Log.Debug('ClientProtocols:'+str(Client.Protocols))
         Log.Debug('SettingsServerWMC_IP:'+str(Prefs["serverwmc_ip"]))
         Log.Debug('ServerWMC_ADDR:'+str(SERVERWMC_ADDR))
         Log.Debug(Request.Headers)

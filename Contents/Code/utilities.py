@@ -104,6 +104,8 @@ def getPlatformInt(platform):
                 return 1
         elif platform=='iOS':
                 return 2
+        elif platform=='tvOS':
+                return 2
         elif platform=='Android':
                 return 3
         elif platform=='Roku':
