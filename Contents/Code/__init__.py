@@ -604,7 +604,7 @@ def getProgramPage(chID, chName, programID, title, name, summary, startTime, end
 
 ####################################################################################################
 @route(PREFIX + '/createVCO')
-def CreateVCO(url, title, summary, duration, icon='', container=False, checkFiles=0):
+def CreateVCO(url, title, summary, duration, icon='', container=False, checkFiles=0, **kwargs):
 
         if VID_QUALITY=='1080':
                 video_resolution = 1080
@@ -638,10 +638,11 @@ def CreateVCO(url, title, summary, duration, icon='', container=False, checkFile
                 container = "mpegts",
                 video_resolution = video_resolution,
                 bitrate = bitrate,
-                video_codec = "h.264",
-                audio_codec = "AC3",
+                video_codec = "mpeg2video",
+                audio_codec = "ac3",
                 audio_channels = 6,
-                optimized_for_streaming = True
+                optimized_for_streaming = True,
+                protocols = "hls"
                 )
 
 
